@@ -60,8 +60,8 @@ export function AddPanel({
       style={{
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 18,
+        padding: 18,
         marginBottom: 14,
       }}
     >

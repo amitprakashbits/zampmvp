@@ -157,9 +157,11 @@ State is **React-only** — no `localStorage` / `sessionStorage`.
 
 ## Tech
 
-Vite · React 18 · TypeScript · Tailwind CSS · lucide-react. The visual system
-uses explicit design tokens (`theme.ts`) to keep the original look; Tailwind is
-wired up and available.
+Vite · React 18 · TypeScript · Tailwind CSS · lucide-react. The visual system is
+**Zamp-inspired** (zamp.ai): a neutral-grey canvas, heavy display wordmark,
+**Geist / Geist Mono** type, a first-person monospace "terminal" intro, vivid
+status cards, and big rounded panels. It's driven by explicit design tokens in
+`theme.ts`; Tailwind is wired up and available.
 
 ---
 

@@ -17,6 +17,7 @@ import { API_MODE, getDecision } from "./lib/agent";
 import { applyLearning, recordOutcome as foldOutcome } from "./lib/learning";
 import { dispatchOutreach } from "./lib/dispatch";
 import { money, sleep, stamp, useCountUp } from "./lib/utils";
+import { Hero } from "./components/Hero";
 import { TopBar } from "./components/TopBar";
 import { Scorecard, type Metrics } from "./components/Scorecard";
 import { Lane } from "./components/queue/Lane";
@@ -329,17 +330,19 @@ export default function App() {
       <style>{`
         @keyframes rcv-ping { 0%{transform:scale(1);opacity:.55} 70%,100%{transform:scale(2.6);opacity:0} }
         @keyframes rcv-in { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+        @keyframes rcv-blink { 0%,50%{opacity:1} 50.01%,100%{opacity:0} }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
         ::-webkit-scrollbar{height:8px;width:8px} ::-webkit-scrollbar-thumb{background:${C.line};border-radius:8px}
         input::placeholder{color:${C.faint}}
       `}</style>
 
       <div style={{ maxWidth: 1320, margin: "0 auto", padding: "22px 22px 56px" }}>
+        <Hero apiMode={API_MODE} />
+
         <TopBar
           running={running}
           phase={phase}
           inboxCount={inboxCount}
-          apiMode={API_MODE}
           mode={mode}
           onToggleMode={setMode}
           onToggleAdd={() => setShowAdd((s) => !s)}
@@ -402,8 +405,8 @@ export default function App() {
           style={{
             background: C.surface,
             border: `1px solid ${C.line}`,
-            borderRadius: 14,
-            padding: 16,
+            borderRadius: 20,
+            padding: 18,
             marginBottom: 14,
           }}
         >

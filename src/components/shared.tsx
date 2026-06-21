@@ -91,8 +91,8 @@ export function Stat({
         minWidth: 150,
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 12,
-        padding: "13px 15px",
+        borderRadius: 16,
+        padding: "14px 16px",
       }}
     >
       <Eyebrow style={accent ? { color: accent } : undefined}>{label}</Eyebrow>
@@ -111,8 +111,8 @@ export function CardShell({ accent, children }: { accent: string; children: Reac
         background: C.surface,
         border: `1px solid ${C.line}`,
         borderLeft: `3px solid ${accent}`,
-        borderRadius: 9,
-        padding: 11,
+        borderRadius: 13,
+        padding: 12,
         animation: "rcv-in 0.28s ease",
       }}
     >

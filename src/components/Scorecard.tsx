@@ -25,8 +25,8 @@ export function Scorecard({ m, revDisplay }: { m: Metrics; revDisplay: number })
           flex: "2 1 280px",
           minWidth: 250,
           background: C.ink,
-          borderRadius: 12,
-          padding: "16px 18px",
+          borderRadius: 18,
+          padding: "18px 20px",
           color: "#fff",
         }}
       >

@@ -20,8 +20,8 @@ export function AuditTrail({ log }: { log: AuditEntry[] }) {
       style={{
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 18,
+        padding: 18,
       }}
     >
       <Eyebrow>Audit log · {log.length} entries</Eyebrow>

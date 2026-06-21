@@ -37,8 +37,8 @@ export function LearningPanel({ learning }: { learning: LearningStats }) {
       style={{
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 12,
-        padding: 16,
+        borderRadius: 18,
+        padding: 18,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>
