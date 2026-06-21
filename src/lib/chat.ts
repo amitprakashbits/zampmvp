@@ -3,12 +3,14 @@ import type {
   ChatAction,
   ChatMessage,
   LearningStats,
+  Policy,
   RunMode,
   User,
 } from "../types";
 import type { Metrics } from "../components/Scorecard";
 import { API_MODE, liveChatComplete } from "./agent";
 import { learningView } from "./learning";
+import { policyRules } from "./guardrails";
 import { money } from "./utils";
 
 /* ────────────────────────────────────────────────────────────────────────
@@ -28,6 +30,7 @@ export interface ChatContext {
   inbox: number;
   users: User[];
   learning: LearningStats;
+  policy: Policy;
 }
 
 export interface ChatReply {
@@ -36,6 +39,18 @@ export interface ChatReply {
 }
 
 const has = (t: string, ...needles: string[]) => needles.some((n) => t.includes(n));
+
+/** Parse a dollar amount like "$100,000", "100k", "1m" from text. */
+function parseAmount(t: string): number | null {
+  const m = t.match(/\$?\s*([\d][\d,]*(?:\.\d+)?)\s*([km])?/i);
+  if (!m) return null;
+  let n = Number(m[1].replace(/,/g, ""));
+  if (!Number.isFinite(n)) return null;
+  const suffix = (m[2] || "").toLowerCase();
+  if (suffix === "k") n *= 1000;
+  if (suffix === "m") n *= 1_000_000;
+  return n;
+}
 
 /** Map a free-text instruction to a real action (deterministic, both modes). */
 function detectAction(t: string): ChatAction {
@@ -49,8 +64,30 @@ function detectAction(t: string): ChatAction {
     return { type: "set_mode", mode: "shadow" };
   if (has(t, "reset", "clear the queue", "start over", "start fresh"))
     return { type: "reset" };
+
+  // guardrail / policy controls
+  if (has(t, "escalate") && has(t, "over", "above", "beyond", "ceiling", "more than", "greater than")) {
+    const amt = parseAmount(t);
+    if (amt != null) return { type: "set_policy", patch: { maxAutoValue: amt } };
+  }
+  if (has(t, "confidence")) {
+    const m = t.match(/(\d+(?:\.\d+)?)\s*(%?)/);
+    if (m) {
+      let v = Number(m[1]);
+      if (m[2] === "%" || v > 1) v = v / 100;
+      v = Math.max(0.3, Math.min(0.95, v));
+      return { type: "set_policy", patch: { minConfidence: v } };
+    }
+  }
+  if (has(t, "stop escalating negative", "ignore sentiment", "don't escalate negative", "dont escalate negative"))
+    return { type: "set_policy", patch: { escalateNegativeSentiment: false } };
+  if (has(t, "escalate negative", "escalate on negative", "flag negative sentiment"))
+    return { type: "set_policy", patch: { escalateNegativeSentiment: true } };
+
   return { type: "none" };
 }
+
+const policyLine = (p: Policy) => policyRules(p).map((r) => `${r.label}: ${r.value}`).join("; ");
 
 /* ── grounded state helpers (shared by mock answers + the live prompt) ── */
 
@@ -91,6 +128,7 @@ function stateSnapshot(ctx: ChatContext): string {
     esc.length ? `Escalated to a human:\n${esc.join("\n")}` : `Nothing escalated.`,
     skip.length ? `Skipped (already converting):\n${skip.join("\n")}` : `Nothing skipped yet.`,
     learned.length ? `What I've learned (channel leaders by drop-off reason):\n${learned.join("\n")}` : `No outcomes learned yet.`,
+    `Operator guardrails I enforce: ${policyLine(ctx.policy)}.`,
   ].join("\n\n");
 }
 
@@ -131,6 +169,9 @@ function mockAnswer(t: string, ctx: ChatContext): string {
       ? "I'm in shadow mode: I make every real decision and show the exact payload I'd send, but I don't send anything. It's the safe rollout posture. Say \"go live\" to route through the dispatch seam."
       : "I'm in live mode — actions route through the dispatch seam (currently a stub, so still nothing actually sends). Say \"switch to shadow\" for a pure dry-run.";
   }
+  if (has(t, "guardrail", "policy", "rules", "limits", "controls", "allowed to")) {
+    return `My operator guardrails right now — ${policyLine(ctx.policy)}. They only make me more conservative (auto-action → human), never less. Tell me e.g. "escalate over $50k" or "set confidence floor to 0.8" and I'll adopt it on the next shift.`;
+  }
   if (has(t, "hello", "hi ", "hey", "who are you", "what can you", "help", "what do you")) {
     return "I'm Recover — I work your funnel's stalled users on my own: diagnose each one, pick a channel, act / escalate / skip, and learn from outcomes. You can delegate to me (\"run the shift\", \"simulate outcomes\", \"go live\") or ask about my calls (\"why did you escalate the big accounts?\", \"what's working best?\").";
   }
@@ -152,6 +193,18 @@ function actionReply(action: ChatAction, ctx: ChatContext): string {
         : "Back to shadow mode — I'll decide everything and show the exact payloads, but send nothing.";
     case "reset":
       return "Resetting the shift — fresh queue, cleared metrics. Say the word and I'll start working again.";
+    case "set_policy": {
+      const p = action.patch;
+      if (p.maxAutoValue != null)
+        return `Got it — I'll escalate any account at or above ${money(p.maxAutoValue)} for human sign-off instead of auto-actioning. Re-run the shift to apply it.`;
+      if (p.minConfidence != null)
+        return `Done — my confidence floor to auto-act is now ${p.minConfidence.toFixed(2)}. Anything I'm less sure about goes to a human. Re-run the shift to see it.`;
+      if (p.escalateNegativeSentiment != null)
+        return p.escalateNegativeSentiment
+          ? "I'll escalate any negative-sentiment account to a human rather than send a templated touch."
+          : "Understood — I'll no longer auto-escalate purely on negative sentiment.";
+      return "Guardrail updated.";
+    }
     default:
       return "";
   }

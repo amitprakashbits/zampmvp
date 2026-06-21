@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { C, MONO } from "../../theme";
 import type { OutcomeKind, User } from "../../types";
-import { CardShell, ChannelTag, DraftToggle, Name } from "../shared";
+import { CardShell, ChannelTag, ConfidenceChip, DraftToggle, Name } from "../shared";
 
 const OUTCOME_LABEL: Record<OutcomeKind, string> = {
   recovered: "Recovered",
@@ -140,6 +140,7 @@ export function DecisionCard({
         {r?.channel && r.channel !== "—" && <span style={{ color: C.line }}>·</span>}
         <ShiftedChannel u={u} />
         <DispatchPill u={u} />
+        {r && <span style={{ marginLeft: "auto" }}><ConfidenceChip value={r.confidence} /></span>}
       </div>
 
       <div style={{ fontSize: 12.5, color: C.ink, marginTop: 7, lineHeight: 1.45 }}>

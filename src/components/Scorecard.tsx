@@ -13,6 +13,7 @@ export interface Metrics {
   autoPct: number;
   escPct: number;
   revenue: number;
+  atRisk: number;
   avg: number;
 }
 
@@ -144,8 +145,8 @@ export function Scorecard({ m, revDisplay }: { m: Metrics; revDisplay: number })
               gap: 6,
             }}
           >
-            <TrendingUp size={14} /> {m.recovered} user{m.recovered === 1 ? "" : "s"} re-engaged after
-            the agent acted
+            <TrendingUp size={14} /> {m.recovered} user{m.recovered === 1 ? "" : "s"} re-engaged ·{" "}
+            <span style={{ color: "rgba(255,255,255,0.92)" }}>{money(m.atRisk)} still at risk</span>
           </div>
         </div>
       </div>

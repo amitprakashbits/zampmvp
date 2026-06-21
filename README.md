@@ -11,8 +11,9 @@ queue of stalled users **on its own**:
 - **Drafts** the actual outreach copy
 - **Escalates** sensitive / high-value / negative-sentiment cases to a human
 - **Learns** from recorded outcomes and shifts future channel choices
+- Runs inside operator **guardrails** and reports a **confidence** on every call
 - Takes **delegation** and **explains its own calls** via a built-in chat
-- Keeps a full **audit trail** and owns one number: **recovered revenue**
+- Keeps a full, **exportable audit trail** and owns one number: **recovered revenue**
 
 It demonstrates the four things an "AI employee" has to do — monitor, act,
 escalate, and learn — with every decision legible and auditable.
@@ -110,6 +111,21 @@ channel its reasoning cites what it learned, e.g.
 
 (The seed ships with a little prior history so this shift fires on the very first
 shift — watch **Marcus Lee** get moved off his Email preference onto Call.)
+
+### Operator controls (autonomy with a leash)
+
+A serious autonomous employee needs limits, self-awareness, and an audit trail:
+
+- **Guardrails panel** — operator-set policy the agent enforces on every decision:
+  escalate accounts ≥ a value ceiling, escalate on negative sentiment, and a
+  minimum-confidence floor to auto-act. Guardrails can only make the agent *more*
+  conservative (auto-action → human), never less. Tune them inline or via chat
+  ("escalate over $50k", "set confidence floor to 0.8"); a counter shows how many
+  fired this shift, and each override is shown on the card + logged.
+- **Decision confidence** — the agent self-assesses a 0–1 confidence on every
+  call (shown as a chip); low confidence trips the guardrail to a human.
+- **Exportable audit** — filter the log (Decisions / Actions / Outcomes /
+  Escalations) and export the full decision trail as JSON for compliance.
 
 ### Talk to Recover (delegation surface)
 

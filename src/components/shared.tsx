@@ -73,6 +73,24 @@ export function ChannelTag({ channel }: { channel?: Channel | "—" }) {
   );
 }
 
+export function ConfidenceChip({ value }: { value: number }) {
+  const v = Number.isFinite(value) ? value : 0.7;
+  const pct = Math.round(v * 100);
+  const color = v >= 0.75 ? C.recovered : v >= 0.55 ? C.escalated : "#B42318";
+  return (
+    <span
+      title={`Decision confidence ${value.toFixed(2)}`}
+      style={{ display: "inline-flex", alignItems: "center", gap: 5, fontFamily: MONO, fontSize: 10.5, color }}
+    >
+      conf
+      <span style={{ width: 28, height: 4, borderRadius: 3, background: C.line, position: "relative", overflow: "hidden" }}>
+        <span style={{ position: "absolute", inset: 0, width: `${pct}%`, background: color }} />
+      </span>
+      {v.toFixed(2)}
+    </span>
+  );
+}
+
 export function Stat({
   label,
   children,

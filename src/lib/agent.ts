@@ -35,12 +35,17 @@ export function parseAgentJSON(text: string): AgentDecision {
   let channel = String(obj.channel || "").trim() as Channel | "—";
   if (!CHANNELS.includes(channel as Channel)) channel = "—";
 
+  let confidence = Number(obj.confidence);
+  if (!Number.isFinite(confidence)) confidence = 0.7;
+  confidence = Math.max(0, Math.min(1, confidence));
+
   return {
     root_cause: String(obj.root_cause || "").trim() || "Unspecified",
     channel,
     action,
     reasoning: String(obj.reasoning || "").trim(),
     draft_message: String(obj.draft_message || "").trim(),
+    confidence,
   };
 }
 
@@ -70,11 +75,12 @@ For the user below, decide:
    • SKIP = the user has very likely ALREADY converted or is actively converting right now (e.g. active minutes ago, on the funding screen, just linked a bank). Do NOT spend an outreach chasing a recovery already in motion. A disciplined skip beats a wasted touch and a vanity recovery.
 4. reasoning — 1–2 tight sentences a teammate could audit; reference the learned evidence if it influenced the channel.
 5. draft_message — the actual personalized outreach copy for the chosen channel, in the user's name, short and human. Empty string if action is SKIP.
+6. confidence — your confidence in this decision as a number from 0 to 1 (two decimals). Be honest: lower it when the case is ambiguous or the signals are thin.
 
 User profile:
 ${JSON.stringify(profile, null, 2)}
 
-Return ONLY strict minified JSON with exactly these keys: root_cause, channel, action, reasoning, draft_message. No markdown, no code fences, no preamble, no trailing text.`;
+Return ONLY strict minified JSON with exactly these keys: root_cause, channel, action, reasoning, draft_message, confidence. No markdown, no code fences, no preamble, no trailing text.`;
 }
 
 async function callLiveAgent(user: User, learning: LearningStats): Promise<AgentDecision> {

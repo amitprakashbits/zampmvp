@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Download } from "lucide-react";
 import { C, MONO } from "../theme";
 import type { AuditEntry, AuditKind } from "../types";
 import { Eyebrow } from "./shared";
@@ -11,10 +13,41 @@ const EVENT_COLOR: Record<AuditKind, string> = {
   human: C.escalated,
   outcome: C.recovered,
   learning: C.brand,
+  guardrail: C.escalated,
   error: C.escalated,
 };
 
+const FILTERS: { label: string; match: (k: AuditKind) => boolean }[] = [
+  { label: "All", match: () => true },
+  { label: "Decisions", match: (k) => k === "diagnosed" || k === "learning" },
+  { label: "Actions", match: (k) => k === "actioned" || k === "human" },
+  { label: "Outcomes", match: (k) => k === "outcome" || k === "recovered" || k === "skipped" },
+  { label: "Escalations", match: (k) => k === "escalated" || k === "guardrail" || k === "error" },
+];
+
 export function AuditTrail({ log }: { log: AuditEntry[] }) {
+  const [filter, setFilter] = useState(0);
+  const shown = log.filter((e) => FILTERS[filter].match(e.kind));
+
+  const exportLog = () => {
+    const payload = {
+      product: "Recover — autonomous recovery employee",
+      exported_at: new Date().toISOString(),
+      total_entries: log.length,
+      entries: log
+        .slice()
+        .reverse()
+        .map((e) => ({ time: e.time, who: e.who, kind: e.kind, detail: e.text })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `recover-audit-${log.length}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div
       style={{
@@ -24,7 +57,62 @@ export function AuditTrail({ log }: { log: AuditEntry[] }) {
         padding: 18,
       }}
     >
-      <Eyebrow>Audit log · {log.length} entries</Eyebrow>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Eyebrow>Audit log · {log.length} entries</Eyebrow>
+        <button
+          onClick={exportLog}
+          disabled={log.length === 0}
+          title="Export the full decision trail as JSON"
+          style={{
+            all: "unset",
+            cursor: log.length === 0 ? "default" : "pointer",
+            opacity: log.length === 0 ? 0.4 : 1,
+            marginLeft: "auto",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            fontFamily: MONO,
+            fontSize: 10.5,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: C.ink,
+            background: C.paper,
+            border: `1px solid ${C.line}`,
+            borderRadius: 8,
+            padding: "5px 9px",
+          }}
+        >
+          <Download size={12} /> Export
+        </button>
+      </div>
+
+      {/* filters */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+        {FILTERS.map((f, i) => {
+          const active = i === filter;
+          return (
+            <button
+              key={f.label}
+              onClick={() => setFilter(i)}
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                fontFamily: MONO,
+                fontSize: 10.5,
+                letterSpacing: "0.03em",
+                color: active ? "#fff" : C.soft,
+                background: active ? C.ink : C.paper,
+                border: `1px solid ${active ? C.ink : C.line}`,
+                borderRadius: 99,
+                padding: "4px 10px",
+              }}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div
         style={{
           marginTop: 12,
@@ -34,30 +122,24 @@ export function AuditTrail({ log }: { log: AuditEntry[] }) {
           flexDirection: "column",
         }}
       >
-        {log.length === 0 && (
+        {shown.length === 0 && (
           <div style={{ fontSize: 13, color: C.faint, padding: "8px 0" }}>
-            No actions yet. Start a shift to watch the agent work the queue.
+            {log.length === 0
+              ? "No actions yet. Start a shift to watch the agent work the queue."
+              : "No entries in this view."}
           </div>
         )}
-        {log.map((e, i) => (
+        {shown.map((e, i) => (
           <div
             key={i}
             style={{
               display: "flex",
               gap: 10,
               padding: "7px 0",
-              borderBottom: i === log.length - 1 ? "none" : `1px solid ${C.lineSoft}`,
+              borderBottom: i === shown.length - 1 ? "none" : `1px solid ${C.lineSoft}`,
             }}
           >
-            <span
-              style={{
-                fontFamily: MONO,
-                fontSize: 11,
-                color: C.faint,
-                flexShrink: 0,
-                paddingTop: 1,
-              }}
-            >
+            <span style={{ fontFamily: MONO, fontSize: 11, color: C.faint, flexShrink: 0, paddingTop: 1 }}>
               {e.time}
             </span>
             <span

@@ -53,6 +53,7 @@ export function mockDecision(user: User): AgentDecision {
       reasoning:
         "Signals show active progress in the last few minutes (just linked a bank / on the funding screen). A disciplined skip beats a wasted touch and a vanity recovery.",
       draft_message: "",
+      confidence: 0.93,
     };
   }
 
@@ -79,6 +80,7 @@ export function mockDecision(user: User): AgentDecision {
         ? `Compliance-gated and high-value (${"$" + user.value.toLocaleString()}). A templated nudge can't clear a manual KYC review — routing to a human.`
         : `High-value (${"$" + user.value.toLocaleString()}) and explicitly unhappy (mentions closing / unclear fees). A canned message risks the account — a human should own this.`,
       draft_message: "",
+      confidence: isCompliance ? 0.71 : 0.66,
     };
   }
 
@@ -94,11 +96,13 @@ export function mockDecision(user: User): AgentDecision {
   })();
 
   const channel = user.pref;
+  const confidence = Math.min(0.9, 0.72 + Math.min(sig.length, 6) * 0.025);
   return {
     root_cause: rootCause,
     channel,
     action: "ACT",
     reasoning: `Warm, recoverable signals and no red flags. Reaching out on ${channel} (their preference) while intent is still fresh.`,
     draft_message: draftFor(user, channel, rootCause),
+    confidence: Math.round(confidence * 100) / 100,
   };
 }

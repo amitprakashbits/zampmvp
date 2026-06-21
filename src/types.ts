@@ -29,10 +29,26 @@ export interface AgentDecision {
   action: ActionKind;
   reasoning: string;
   draft_message: string;
+  /** The agent's self-assessed confidence in this decision, 0–1. */
+  confidence: number;
   /** Channel before the learning layer shifted it, if it did. */
   base_channel?: Channel | "—";
   /** Human-readable note explaining a learning-driven channel shift / confirmation. */
   learning_note?: string;
+  /** Set when an operator guardrail overrode the decision (ACT → ESCALATE). */
+  guardrail?: string;
+}
+
+/* ── operator guardrails ──────────────────────────────────────────────── */
+
+/** Policy the operator sets; the agent enforces it on every decision. */
+export interface Policy {
+  /** Auto-action is not allowed at or above this account value → escalate. */
+  maxAutoValue: number;
+  /** Force escalation when signals show negative sentiment. */
+  escalateNegativeSentiment: boolean;
+  /** Minimum decision confidence to auto-act; below this → escalate. */
+  minConfidence: number;
 }
 
 /** What the agent would (shadow) or did (live stub) dispatch. */
@@ -80,6 +96,7 @@ export type AuditKind =
   | "human"
   | "outcome"
   | "learning"
+  | "guardrail"
   | "error";
 
 export interface AuditEntry {
@@ -117,4 +134,5 @@ export type ChatAction =
   | { type: "run_shift" }
   | { type: "simulate" }
   | { type: "set_mode"; mode: RunMode }
+  | { type: "set_policy"; patch: Partial<Policy> }
   | { type: "reset" };

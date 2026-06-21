@@ -11,12 +11,14 @@ import type {
   LearningStats,
   NewUserInput,
   OutcomeKind,
+  Policy,
   RunMode,
   User,
 } from "./types";
 import { fresh, seedLearning } from "./lib/seed";
 import { API_MODE, getDecision } from "./lib/agent";
 import { applyLearning, recordOutcome as foldOutcome } from "./lib/learning";
+import { applyGuardrails, DEFAULT_POLICY } from "./lib/guardrails";
 import { dispatchOutreach } from "./lib/dispatch";
 import { money, sleep, stamp, useCountUp } from "./lib/utils";
 import { Hero } from "./components/Hero";
@@ -26,6 +28,7 @@ import { Lane } from "./components/queue/Lane";
 import { AddPanel } from "./components/AddPanel";
 import { AuditTrail } from "./components/AuditTrail";
 import { LearningPanel } from "./components/LearningPanel";
+import { GuardrailsPanel } from "./components/GuardrailsPanel";
 import { ChatPanel } from "./components/ChatPanel";
 import { respondToChat, type ChatContext } from "./lib/chat";
 
@@ -47,6 +50,7 @@ export default function App() {
   const [note, setNote] = useState<string | null>(null);
   const [mode, setModeState] = useState<RunMode>("shadow");
   const [learning, setLearning] = useState<LearningStats>(seedLearning);
+  const [policy, setPolicyState] = useState<Policy>(DEFAULT_POLICY);
 
   // Refs mirror state so the async queue worker reads current values mid-shift.
   const usersRef = useRef(users);
@@ -65,6 +69,12 @@ export default function App() {
   const setLearn = useCallback((next: LearningStats) => {
     learningRef.current = next;
     setLearning(next);
+  }, []);
+
+  const policyRef = useRef(policy);
+  const setPolicy = useCallback((next: Policy) => {
+    policyRef.current = next;
+    setPolicyState(next);
   }, []);
 
   const patch = useCallback(
@@ -109,6 +119,7 @@ export default function App() {
           reasoning:
             "The agent couldn't reach a confident decision (API or parse error), so it routed this user to a human instead of dropping them.",
           draft_message: "",
+          confidence: 0,
         };
         patch(user.id, { status: "escalated", result });
         audit(user.name, "diagnosis failed → escalated to a human (fail-safe)", "error");
@@ -116,10 +127,13 @@ export default function App() {
         return;
       }
 
-      // Learning layer may shift the channel before anything is dispatched.
-      const result = applyLearning(base, user, learningRef.current);
-      audit(user.name, `diagnosed — ${result.root_cause}`, "diagnosed");
+      // Learning layer may shift the channel; then operator guardrails may
+      // override an ACT into an escalation.
+      const learned = applyLearning(base, user, learningRef.current);
+      const result = applyGuardrails(learned, user, policyRef.current);
+      audit(user.name, `diagnosed — ${result.root_cause} (confidence ${result.confidence.toFixed(2)})`, "diagnosed");
       if (result.learning_note) audit(user.name, result.learning_note, "learning");
+      if (result.guardrail) audit(user.name, `guardrail → ${result.guardrail}`, "guardrail");
 
       if (result.action === "SKIP") {
         patch(user.id, { status: "skipped", result });
@@ -292,6 +306,15 @@ export default function App() {
     const revenue = users
       .filter((u) => u.status === "recovered")
       .reduce((s, u) => s + u.value, 0);
+    const atRisk = users
+      .filter(
+        (u) =>
+          u.status === "inbox" ||
+          u.status === "processing" ||
+          u.status === "escalated" ||
+          (u.status === "actioned" && u.outcome !== "recovered" && u.outcome !== "converted_anyway"),
+      )
+      .reduce((s, u) => s + u.value, 0);
     const avg = times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0;
     return {
       acted,
@@ -303,9 +326,15 @@ export default function App() {
       autoPct,
       escPct,
       revenue,
+      atRisk,
       avg,
     };
   }, [users, times]);
+
+  const guardrailsFired = useMemo(
+    () => users.filter((u) => u.result?.guardrail).length,
+    [users],
+  );
 
   const revDisplay = useCountUp(m.revenue);
 
@@ -332,6 +361,7 @@ export default function App() {
       inbox: inboxCount,
       users,
       learning,
+      policy,
     };
     return respondToChat(message, ctx, history);
   };
@@ -346,6 +376,9 @@ export default function App() {
         break;
       case "set_mode":
         setMode(action.mode);
+        break;
+      case "set_policy":
+        setPolicy({ ...policyRef.current, ...action.patch });
         break;
       case "reset":
         reset();
@@ -486,6 +519,11 @@ export default function App() {
               />
             ))}
           </div>
+        </div>
+
+        {/* guardrails */}
+        <div style={{ marginBottom: 14 }}>
+          <GuardrailsPanel policy={policy} setPolicy={setPolicy} fired={guardrailsFired} />
         </div>
 
         {/* learning + audit */}

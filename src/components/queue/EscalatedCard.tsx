@@ -1,7 +1,7 @@
-import { Flag } from "lucide-react";
+import { Flag, ShieldCheck } from "lucide-react";
 import { C, MONO } from "../../theme";
 import type { User } from "../../types";
-import { CardShell, DraftToggle, Name } from "../shared";
+import { CardShell, ConfidenceChip, DraftToggle, Name } from "../shared";
 
 export function EscalatedCard({
   u,
@@ -29,21 +29,45 @@ export function EscalatedCard({
   return (
     <CardShell accent={C.escalated}>
       <Name name={u.name} value={u.value} />
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 4,
-          marginTop: 5,
-          fontFamily: MONO,
-          fontSize: 10.5,
-          letterSpacing: "0.06em",
-          color: C.escalated,
-          textTransform: "uppercase",
-        }}
-      >
-        <Flag size={12} strokeWidth={2.2} /> awaiting you
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontFamily: MONO,
+            fontSize: 10.5,
+            letterSpacing: "0.06em",
+            color: C.escalated,
+            textTransform: "uppercase",
+          }}
+        >
+          <Flag size={12} strokeWidth={2.2} /> awaiting you
+        </span>
+        {u.result && <span style={{ marginLeft: "auto" }}><ConfidenceChip value={u.result.confidence} /></span>}
       </div>
+      {u.result?.guardrail && (
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginTop: 8,
+            fontSize: 11.5,
+            color: C.escalated,
+            background: "#FBEFE2",
+            border: "1px solid #F0DBC4",
+            borderRadius: 7,
+            padding: "6px 9px",
+            lineHeight: 1.4,
+          }}
+        >
+          <ShieldCheck size={13} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>
+            <b style={{ fontWeight: 600 }}>Guardrail tripped — </b>
+            {u.result.guardrail}
+          </span>
+        </div>
+      )}
       <div style={{ fontSize: 12.5, color: C.ink, marginTop: 7, lineHeight: 1.45 }}>
         <span style={{ color: C.soft }}>Root cause — </span>
         {u.result?.root_cause}
