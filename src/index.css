@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* The component system uses an explicit inline-style palette (see theme.ts) to
+   preserve the original look. Tailwind is wired up and available for any future
+   work, but global resets are kept minimal so they don't fight the design. */
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
