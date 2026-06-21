@@ -99,3 +99,22 @@ export interface ChannelStat {
 
 /** keyed: dropOff reason → channel → stats */
 export type LearningStats = Record<string, Partial<Record<Channel, ChannelStat>>>;
+
+/* ── chat / delegation surface ────────────────────────────────────────── */
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "agent";
+  text: string;
+  ts: string;
+  /** marks a message that triggered a real action (rendered with an accent). */
+  action?: boolean;
+}
+
+/** Actions the chat can actually trigger on the running employee. */
+export type ChatAction =
+  | { type: "none" }
+  | { type: "run_shift" }
+  | { type: "simulate" }
+  | { type: "set_mode"; mode: RunMode }
+  | { type: "reset" };

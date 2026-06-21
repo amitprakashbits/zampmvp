@@ -11,6 +11,7 @@ queue of stalled users **on its own**:
 - **Drafts** the actual outreach copy
 - **Escalates** sensitive / high-value / negative-sentiment cases to a human
 - **Learns** from recorded outcomes and shifts future channel choices
+- Takes **delegation** and **explains its own calls** via a built-in chat
 - Keeps a full **audit trail** and owns one number: **recovered revenue**
 
 It demonstrates the four things an "AI employee" has to do — monitor, act,
@@ -109,6 +110,19 @@ channel its reasoning cites what it learned, e.g.
 
 (The seed ships with a little prior history so this shift fires on the very first
 shift — watch **Marcus Lee** get moved off his Email preference onto Call.)
+
+### Talk to Recover (delegation surface)
+
+The **"Ask Recover"** chat (bottom-right) is how you *manage* the employee — not a
+chatbot you re-prompt for each action. It does two things, grounded in live state:
+
+- **Takes delegation as real actions** — "run the shift", "simulate outcomes",
+  "go live" / "switch to shadow", "reset" actually drive the app (deterministic,
+  works in any mode and shows an `↳ action taken` tag).
+- **Explains its own calls** — "why did you escalate the big accounts?", "what's
+  working best?", "summarize the shift" answer from the actual queue, metrics and
+  learned channel data. With a key it answers via `claude-sonnet-4-6`; without
+  one it answers from grounded mock heuristics.
 
 ---
 

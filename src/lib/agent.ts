@@ -103,6 +103,36 @@ async function callLiveAgent(user: User, learning: LearningStats): Promise<Agent
   return parseAgentJSON(text);
 }
 
+/** Live conversational completion for the chat surface (live mode only). */
+export async function liveChatComplete(
+  system: string,
+  turns: { role: "user" | "assistant"; content: string }[],
+): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey as string,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system,
+      messages: turns,
+    }),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message || "api error");
+  return (data.content || [])
+    .filter((b: { type: string }) => b.type === "text")
+    .map((b: { text: string }) => b.text)
+    .join("\n")
+    .trim();
+}
+
 /** Single entry point used by the queue worker. Picks backend by API_MODE. */
 export async function getDecision(
   user: User,

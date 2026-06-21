@@ -128,31 +128,59 @@ export function Hero({ apiMode }: { apiMode: ApiMode }) {
         </p>
       </div>
 
-      {/* the wordmark */}
-      <div
-        style={{
-          fontFamily: DISPLAY,
-          fontWeight: 800,
-          fontSize: "clamp(86px, 21vw, 280px)",
-          lineHeight: 0.84,
-          letterSpacing: "-0.04em",
-          color: C.ink,
-          marginTop: -6,
-          display: "flex",
-          alignItems: "flex-end",
-          gap: "0.04em",
-        }}
-      >
-        recover
-        <span
+      {/* the wordmark, over a drifting gradient glow */}
+      <div style={{ position: "relative", marginTop: -6 }}>
+        <div
           style={{
-            width: "0.14em",
-            height: "0.14em",
-            borderRadius: 99,
-            background: C.brand,
-            marginBottom: "0.12em",
+            position: "absolute",
+            left: "2%",
+            top: "12%",
+            width: "62%",
+            height: "78%",
+            background:
+              "radial-gradient(circle, rgba(91,51,224,0.32), rgba(47,107,255,0.16) 48%, transparent 72%)",
+            filter: "blur(46px)",
+            animation: "rcv-drift 9s ease-in-out infinite",
+            pointerEvents: "none",
+            zIndex: 0,
           }}
         />
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            fontFamily: DISPLAY,
+            fontWeight: 800,
+            fontSize: "clamp(86px, 21vw, 280px)",
+            lineHeight: 0.84,
+            letterSpacing: "-0.04em",
+            display: "flex",
+            alignItems: "flex-end",
+            gap: "0.04em",
+          }}
+        >
+          <span
+            style={{
+              backgroundImage: "linear-gradient(102deg, #0A0A0A 52%, #3B1FAE 78%, #2F6BFF 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            recover
+          </span>
+          <span
+            style={{
+              width: "0.14em",
+              height: "0.14em",
+              borderRadius: 99,
+              background: "linear-gradient(135deg, #5B33E0, #2F6BFF)",
+              marginBottom: "0.12em",
+              boxShadow: "0 0 28px rgba(91,51,224,0.6)",
+            }}
+          />
+        </div>
       </div>
       <div
         style={{

@@ -104,16 +104,29 @@ export function Stat({
   );
 }
 
-export function CardShell({ accent, children }: { accent: string; children: ReactNode }) {
+export function CardShell({
+  accent,
+  children,
+  glow,
+}: {
+  accent: string;
+  children: ReactNode;
+  glow?: boolean;
+}) {
   return (
     <div
+      className="rcv-card"
       style={{
+        position: "relative",
         background: C.surface,
         border: `1px solid ${C.line}`,
         borderLeft: `3px solid ${accent}`,
         borderRadius: 13,
         padding: 12,
         animation: "rcv-in 0.28s ease",
+        boxShadow: glow
+          ? `0 0 0 1px ${accent}40, 0 16px 40px -16px ${accent}99`
+          : "0 1px 2px rgba(10,10,10,0.03)",
       }}
     >
       {children}

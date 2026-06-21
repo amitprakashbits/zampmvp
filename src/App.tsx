@@ -5,6 +5,8 @@ import type {
   AgentDecision,
   AuditEntry,
   AuditKind,
+  ChatAction,
+  ChatMessage,
   Channel,
   LearningStats,
   NewUserInput,
@@ -24,6 +26,8 @@ import { Lane } from "./components/queue/Lane";
 import { AddPanel } from "./components/AddPanel";
 import { AuditTrail } from "./components/AuditTrail";
 import { LearningPanel } from "./components/LearningPanel";
+import { ChatPanel } from "./components/ChatPanel";
+import { respondToChat, type ChatContext } from "./lib/chat";
 
 const PROC_STEPS = [
   "Reading signals",
@@ -317,11 +321,50 @@ export default function App() {
   const inboxCount = lanes.inbox.length;
   const canSimulate = users.some((u) => u.status === "actioned" && !u.outcome);
 
+  /* ── chat / delegation surface ────────────────────────────────────── */
+  // Plain closures (not memoised) so they always read the latest state when
+  // the user sends a message.
+  const chatRespond = (message: string, history: ChatMessage[]) => {
+    const ctx: ChatContext = {
+      mode,
+      apiMode: API_MODE,
+      metrics: m,
+      inbox: inboxCount,
+      users,
+      learning,
+    };
+    return respondToChat(message, ctx, history);
+  };
+
+  const runChatAction = (action: ChatAction) => {
+    switch (action.type) {
+      case "run_shift":
+        void runShift();
+        break;
+      case "simulate":
+        simulateOutcomes();
+        break;
+      case "set_mode":
+        setMode(action.mode);
+        break;
+      case "reset":
+        reset();
+        break;
+    }
+  };
+
   return (
     <div
       style={{
         minHeight: "100vh",
-        background: C.paper,
+        backgroundColor: C.paper,
+        backgroundImage: `
+          radial-gradient(900px circle at 6% -8%, rgba(91,51,224,0.13), transparent 42%),
+          radial-gradient(820px circle at 102% 108%, rgba(47,107,255,0.11), transparent 44%),
+          radial-gradient(rgba(10,10,10,0.05) 1px, transparent 1px)
+        `,
+        backgroundSize: "100% 100%, 100% 100%, 22px 22px",
+        backgroundAttachment: "fixed, fixed, fixed",
         fontFamily: SANS,
         color: C.ink,
         WebkitFontSmoothing: "antialiased",
@@ -330,9 +373,15 @@ export default function App() {
       <style>{`
         @keyframes rcv-ping { 0%{transform:scale(1);opacity:.55} 70%,100%{transform:scale(2.6);opacity:0} }
         @keyframes rcv-in { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+        @keyframes rcv-rise { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
         @keyframes rcv-blink { 0%,50%{opacity:1} 50.01%,100%{opacity:0} }
+        @keyframes rcv-drift { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(26px,-22px) scale(1.12)} }
+        @keyframes rcv-shimmer { 0%{background-position:-180% 0} 100%{background-position:180% 0} }
+        @keyframes rcv-sheen { 0%{transform:translateX(-120%)} 60%,100%{transform:translateX(320%)} }
+        .rcv-card{ transition: transform .18s ease, box-shadow .22s ease, border-color .18s ease; }
+        .rcv-card:hover{ transform: translateY(-3px); box-shadow: 0 18px 38px -22px rgba(10,10,10,.45); border-color:#D2D2CC; }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
-        ::-webkit-scrollbar{height:8px;width:8px} ::-webkit-scrollbar-thumb{background:${C.line};border-radius:8px}
+        ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#D6D6CF;border-radius:8px} ::-webkit-scrollbar-thumb:hover{background:#C2C2B8}
         input::placeholder{color:${C.faint}}
       `}</style>
 
@@ -463,6 +512,8 @@ export default function App() {
           agent decides ACT / ESCALATE / SKIP per user, learns from outcomes, on its own
         </div>
       </div>
+
+      <ChatPanel mode={mode} respond={chatRespond} onAction={runChatAction} />
     </div>
   );
 }

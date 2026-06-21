@@ -40,7 +40,17 @@ export function Lane({
 }) {
   return (
     <div style={{ flex: "1 1 230px", minWidth: 230, display: "flex", flexDirection: "column", gap: 9 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, padding: "0 2px" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 7,
+          padding: "6px 10px",
+          borderRadius: 99,
+          background: `${lane.color}14`,
+          border: `1px solid ${lane.color}2E`,
+        }}
+      >
         <Dot color={lane.color} pulse={lane.key === "processing" && items.length > 0} />
         <span
           style={{
@@ -48,12 +58,28 @@ export function Lane({
             fontSize: 11,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: C.ink,
+            color: lane.color,
+            fontWeight: 600,
           }}
         >
           {lane.label}
         </span>
-        <span style={{ fontFamily: MONO, fontSize: 11, color: C.soft, marginLeft: "auto" }}>
+        <span
+          style={{
+            fontFamily: MONO,
+            fontSize: 11,
+            color: "#fff",
+            background: lane.color,
+            borderRadius: 99,
+            minWidth: 18,
+            height: 18,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 5px",
+            marginLeft: "auto",
+          }}
+        >
           {items.length}
         </span>
       </div>
