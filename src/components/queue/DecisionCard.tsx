@@ -5,7 +5,7 @@ import { CardShell, ChannelTag, ConfidenceChip, DraftToggle, Name } from "../sha
 
 const OUTCOME_LABEL: Record<OutcomeKind, string> = {
   recovered: "Recovered",
-  ignored: "Ignored — no response",
+  ignored: "Ignored - no response",
   converted_anyway: "Converted anyway · uncredited",
 };
 
@@ -17,11 +17,11 @@ const OUTCOME_COLOR: Record<OutcomeKind, string> = {
 
 function ShiftedChannel({ u }: { u: User }) {
   const r = u.result;
-  if (!r || r.channel === "—") return null;
+  if (!r || r.channel === "-") return null;
   if (!r.base_channel || r.base_channel === r.channel) {
     return <ChannelTag channel={r.channel} />;
   }
-  // Learning shifted the channel — show the move explicitly.
+  // Learning shifted the channel - show the move explicitly.
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11.5 }}>
       <span style={{ color: C.faint, textDecoration: "line-through" }}>{r.base_channel}</span>
@@ -34,13 +34,27 @@ function ShiftedChannel({ u }: { u: User }) {
 function DispatchPill({ u }: { u: User }) {
   const d = u.dispatch;
   if (!d) return null;
-  const isShadow = d.mode === "shadow";
-  const text = isShadow
-    ? "WOULD SEND · dry-run"
-    : d.status === "noop"
-      ? "LIVE · send stubbed (no-op)"
-      : "SENT · live";
-  const color = isShadow ? C.brand : C.actioned;
+
+  let text: string;
+  let color: string;
+  let bg: string;
+  let border: string;
+  if (d.status === "held_out") {
+    text = "CONTROL · held out";
+    color = C.skipped;
+    bg = C.surfaceAlt;
+    border = C.line;
+  } else if (d.mode === "shadow") {
+    text = "WOULD SEND · dry-run";
+    color = C.accent;
+    bg = C.accentSoft;
+    border = "#D4E2FB";
+  } else {
+    text = d.status === "noop" ? "LIVE · send stubbed" : "SENT · live";
+    color = C.soft;
+    bg = C.surfaceAlt;
+    border = C.line;
+  }
   return (
     <span
       style={{
@@ -49,10 +63,10 @@ function DispatchPill({ u }: { u: User }) {
         gap: 5,
         fontFamily: MONO,
         fontSize: 9.5,
-        letterSpacing: "0.08em",
+        letterSpacing: "0.07em",
         color,
-        background: isShadow ? "#F3EEFE" : "#EFF4FE",
-        border: `1px solid ${isShadow ? "#E2D6FB" : "#D7E3FC"}`,
+        background: bg,
+        border: `1px solid ${border}`,
         borderRadius: 5,
         padding: "2px 6px",
       }}
@@ -92,12 +106,12 @@ function OutcomeButtons({
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ fontSize: 10.5, color: C.faint, marginBottom: 6, fontFamily: MONO, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-        Record outcome → agent learns
+        {u.heldOut ? "Record control outcome → lift" : "Record outcome → agent learns"}
       </div>
       <div style={{ display: "flex", gap: 6 }}>
-        {btn("recovered", "Recovered", C.recovered)}
-        {btn("ignored", "Ignored", C.skipped)}
-        {btn("converted_anyway", "Converted anyway", C.soft)}
+        {btn("recovered", u.heldOut ? "Came back" : "Recovered", C.recovered)}
+        {btn("ignored", u.heldOut ? "Stayed away" : "Ignored", C.skipped)}
+        {!u.heldOut && btn("converted_anyway", "Converted anyway", C.soft)}
       </div>
     </div>
   );
@@ -114,7 +128,7 @@ export function DecisionCard({
   accent: string;
   badge: string;
   BadgeIcon: LucideIcon;
-  /** Only passed for the Actioned lane — enables outcome recording. */
+  /** Only passed for the Actioned lane - enables outcome recording. */
   onOutcome?: (u: User, outcome: OutcomeKind) => void;
 }) {
   const r = u.result;
@@ -137,14 +151,14 @@ export function DecisionCard({
         >
           <BadgeIcon size={12} strokeWidth={2.2} /> {badge}
         </span>
-        {r?.channel && r.channel !== "—" && <span style={{ color: C.line }}>·</span>}
+        {r?.channel && r.channel !== "-" && <span style={{ color: C.line }}>·</span>}
         <ShiftedChannel u={u} />
         <DispatchPill u={u} />
         {r && <span style={{ marginLeft: "auto" }}><ConfidenceChip value={r.confidence} /></span>}
       </div>
 
       <div style={{ fontSize: 12.5, color: C.ink, marginTop: 7, lineHeight: 1.45 }}>
-        <span style={{ color: C.soft }}>Root cause — </span>
+        <span style={{ color: C.soft }}>Root cause - </span>
         {r?.root_cause}
       </div>
       <div style={{ fontSize: 12, color: C.soft, marginTop: 5, lineHeight: 1.45 }}>{r?.reasoning}</div>
@@ -154,9 +168,9 @@ export function DecisionCard({
           style={{
             marginTop: 7,
             fontSize: 11.5,
-            color: C.brand,
-            background: "#F3EEFE",
-            border: "1px solid #E2D6FB",
+            color: C.accent,
+            background: C.accentSoft,
+            border: "1px solid #D4E2FB",
             borderRadius: 7,
             padding: "6px 9px",
             lineHeight: 1.45,
@@ -185,6 +199,7 @@ export function DecisionCard({
           }}
         >
           Outcome: {OUTCOME_LABEL[u.outcome]}
+          {u.heldOut && <span style={{ color: C.faint, fontWeight: 400 }}> · control (uncredited)</span>}
         </div>
       )}
     </CardShell>

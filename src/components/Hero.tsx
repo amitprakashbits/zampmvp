@@ -1,198 +1,127 @@
-import { C, DISPLAY, MONO } from "../theme";
+import { C, DISPLAY, MONO, R } from "../theme";
 import type { ApiMode } from "../types";
 import { Dot } from "./shared";
 
-/* The zamp.ai signature: a heavy lowercase wordmark and a monospace,
-   first-person "terminal" intro that frames the product as an employee. */
+function LogoMark({ size = 30 }: { size?: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: 8,
+        background: C.ink,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <span style={{ display: "flex", flexDirection: "column", gap: size * 0.1 }}>
+        <span style={{ width: size * 0.42, height: size * 0.1, background: "#fff", borderRadius: 2, transform: "skewX(-18deg)" }} />
+        <span style={{ width: size * 0.42, height: size * 0.1, background: "#fff", borderRadius: 2, transform: "skewX(-18deg)" }} />
+      </span>
+    </div>
+  );
+}
+
+/* Compact single-row header: wordmark + first-person brief side by side so the
+   whole identity sits in one viewport band (no big scroll to reach the work). */
 export function Hero({ apiMode }: { apiMode: ApiMode }) {
   return (
-    <section style={{ marginBottom: 26 }}>
-      {/* top row: identity tag + live reasoning badge */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          marginBottom: 22,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+    <header
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        flexWrap: "wrap",
+        marginBottom: 18,
+      }}
+    >
+      {/* left: wordmark */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+        <LogoMark size={34} />
+        <div>
           <div
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: 7,
-              background: C.ink,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              fontFamily: DISPLAY,
+              fontWeight: 700,
+              fontSize: "clamp(30px, 5vw, 46px)",
+              letterSpacing: "-0.035em",
+              lineHeight: 0.95,
+              color: C.ink,
             }}
           >
-            <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <span style={{ width: 12, height: 2.5, background: "#fff", borderRadius: 2, transform: "skewX(-18deg)" }} />
-              <span style={{ width: 12, height: 2.5, background: "#fff", borderRadius: 2, transform: "skewX(-18deg)" }} />
-            </span>
+            recover
           </div>
-          <span
+          <div
             style={{
               fontFamily: MONO,
-              fontSize: 11,
+              fontSize: 10,
               letterSpacing: "0.14em",
               textTransform: "uppercase",
-              color: C.ink,
-              fontWeight: 500,
-            }}
-          >
-            Recover
-          </span>
-          <span style={{ color: C.faint, fontFamily: MONO, fontSize: 11 }}>/</span>
-          <span
-            style={{
-              fontFamily: MONO,
-              fontSize: 11,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
               color: C.soft,
+              marginTop: 4,
             }}
           >
             autonomous recovery employee
-          </span>
+          </div>
         </div>
+      </div>
 
+      {/* right: first-person brief + reasoning-mode badge, on the same line */}
+      <div
+        style={{
+          flex: "1 1 420px",
+          minWidth: 300,
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          background: C.surface,
+          border: `1px solid ${C.line}`,
+          borderRadius: R.lg,
+          padding: "12px 15px",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            flex: 1,
+            fontFamily: MONO,
+            fontSize: 12,
+            lineHeight: 1.55,
+            color: C.soft,
+          }}
+        >
+          <span style={{ color: C.ink }}>Hi, I'm Recover.</span> I work a queue of stalled users on
+          my own - diagnose, pick a channel, act or escalate, and learn from outcomes. I own one
+          number: recovered revenue.
+        </p>
         <div
           title={
             apiMode === "live"
               ? "Reasoning runs on claude-sonnet-4-6 (VITE_ANTHROPIC_API_KEY detected)."
-              : "No API key set — reasoning runs on built-in mock logic."
+              : "No API key set - reasoning runs on built-in deterministic logic."
           }
           style={{
+            flexShrink: 0,
             display: "inline-flex",
             alignItems: "center",
-            gap: 7,
-            background: apiMode === "live" ? "#E7F3EC" : C.surface,
-            border: `1px solid ${apiMode === "live" ? "#C6E4D1" : C.line}`,
-            borderRadius: 99,
-            padding: "6px 12px",
+            gap: 6,
+            background: apiMode === "live" ? "#EAF6EE" : C.surfaceAlt,
+            border: `1px solid ${apiMode === "live" ? "#CDE8D6" : C.line}`,
+            borderRadius: R.pill,
+            padding: "5px 10px",
             fontFamily: MONO,
-            fontSize: 10.5,
-            letterSpacing: "0.06em",
+            fontSize: 10,
+            letterSpacing: "0.05em",
             textTransform: "uppercase",
             color: apiMode === "live" ? C.recovered : C.soft,
           }}
         >
-          <Dot color={apiMode === "live" ? C.recovered : C.faint} pulse={apiMode === "live"} />
-          {apiMode === "live" ? "Live reasoning · sonnet-4-6" : "Mock reasoning"}
+          <Dot color={apiMode === "live" ? C.recovered : C.faint} />
+          {apiMode === "live" ? "Live · sonnet-4-6" : "Mock reasoning"}
         </div>
       </div>
-
-      {/* terminal intro — aligned right, like the zamp.ai hero */}
-      <div
-        style={{
-          maxWidth: 460,
-          marginLeft: "auto",
-          background: C.surface,
-          border: `1px solid ${C.line}`,
-          borderRadius: 16,
-          padding: "16px 18px",
-          fontFamily: MONO,
-          fontSize: 13,
-          lineHeight: 1.7,
-          color: C.ink,
-        }}
-      >
-        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-          <span style={{ width: 9, height: 9, borderRadius: 99, background: C.escalated }} />
-          <span style={{ width: 9, height: 9, borderRadius: 99, background: "#E3B341" }} />
-          <span style={{ width: 9, height: 9, borderRadius: 99, background: C.recovered }} />
-        </div>
-        <p style={{ margin: "0 0 10px" }}>Hi, I'm Recover, an autonomous recovery employee.</p>
-        <p style={{ margin: "0 0 10px", color: C.soft }}>
-          I work a queue of stalled users on my own — diagnose why each one stalled, pick a channel,
-          act or escalate, and learn from every outcome.
-        </p>
-        <p style={{ margin: 0 }}>
-          I own one number: recovered revenue.
-          <span
-            style={{
-              display: "inline-block",
-              width: 8,
-              height: 15,
-              marginLeft: 4,
-              transform: "translateY(2px)",
-              background: C.ink,
-              animation: "rcv-blink 1.1s steps(1) infinite",
-            }}
-          />
-        </p>
-      </div>
-
-      {/* the wordmark, over a drifting gradient glow */}
-      <div style={{ position: "relative", marginTop: -6 }}>
-        <div
-          style={{
-            position: "absolute",
-            left: "2%",
-            top: "12%",
-            width: "62%",
-            height: "78%",
-            background:
-              "radial-gradient(circle, rgba(91,51,224,0.32), rgba(47,107,255,0.16) 48%, transparent 72%)",
-            filter: "blur(46px)",
-            animation: "rcv-drift 9s ease-in-out infinite",
-            pointerEvents: "none",
-            zIndex: 0,
-          }}
-        />
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            fontFamily: DISPLAY,
-            fontWeight: 800,
-            fontSize: "clamp(86px, 21vw, 280px)",
-            lineHeight: 0.84,
-            letterSpacing: "-0.04em",
-            display: "flex",
-            alignItems: "flex-end",
-            gap: "0.04em",
-          }}
-        >
-          <span
-            style={{
-              backgroundImage: "linear-gradient(102deg, #0A0A0A 52%, #3B1FAE 78%, #2F6BFF 100%)",
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            recover
-          </span>
-          <span
-            style={{
-              width: "0.14em",
-              height: "0.14em",
-              borderRadius: 99,
-              background: "linear-gradient(135deg, #5B33E0, #2F6BFF)",
-              marginBottom: "0.12em",
-              boxShadow: "0 0 28px rgba(91,51,224,0.6)",
-            }}
-          />
-        </div>
-      </div>
-      <div
-        style={{
-          fontFamily: MONO,
-          fontSize: 12,
-          letterSpacing: "0.04em",
-          color: C.soft,
-          marginTop: 14,
-        }}
-      >
-        // monitors a funnel, works the queue, escalates the hard calls, compounds what works.
-      </div>
-    </section>
+    </header>
   );
 }

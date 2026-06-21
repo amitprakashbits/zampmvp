@@ -1,12 +1,13 @@
 import { useState, type CSSProperties } from "react";
-import { C, SANS } from "../theme";
+import { C, R, SANS } from "../theme";
 import { CHANNELS, type Channel, type NewUserInput } from "../types";
 import { Eyebrow } from "./shared";
+import { Select } from "./Select";
 
 const STAGES = [
-  "Signup — email unverified",
+  "Signup - email unverified",
   "KYC incomplete",
-  "KYC — manual review",
+  "KYC - manual review",
   "Bank linking failed",
   "Funding (flagged stalled)",
   "Funded, no first trade",
@@ -17,9 +18,9 @@ const inp: CSSProperties = {
   all: "unset",
   boxSizing: "border-box",
   width: "100%",
-  background: C.paper,
+  background: C.surface,
   border: `1px solid ${C.line}`,
-  borderRadius: 7,
+  borderRadius: R.sm,
   padding: "8px 10px",
   fontSize: 13,
   color: C.ink,
@@ -60,7 +61,7 @@ export function AddPanel({
       style={{
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 18,
+        borderRadius: R.lg,
         padding: 18,
         marginBottom: 14,
       }}
@@ -99,11 +100,12 @@ export function AddPanel({
         </div>
         <div>
           <Eyebrow style={{ marginBottom: 5 }}>Dropped off at</Eyebrow>
-          <select style={inp} value={dropOff} onChange={(e) => setDropOff(e.target.value)}>
-            {STAGES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+          <Select
+            ariaLabel="Dropped off at"
+            value={dropOff}
+            onChange={setDropOff}
+            options={STAGES.map((s) => ({ value: s, label: s }))}
+          />
         </div>
         <div>
           <Eyebrow style={{ marginBottom: 5 }}>Last activity</Eyebrow>
@@ -116,15 +118,12 @@ export function AddPanel({
         </div>
         <div>
           <Eyebrow style={{ marginBottom: 5 }}>Channel preference</Eyebrow>
-          <select
-            style={inp}
+          <Select
+            ariaLabel="Channel preference"
             value={pref}
-            onChange={(e) => setPref(e.target.value as Channel)}
-          >
-            {CHANNELS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+            onChange={(v) => setPref(v as Channel)}
+            options={CHANNELS.map((s) => ({ value: s, label: s }))}
+          />
         </div>
         <div>
           <Eyebrow style={{ marginBottom: 5 }}>Account value ($)</Eyebrow>
@@ -152,9 +151,9 @@ export function AddPanel({
             all: "unset",
             cursor: "pointer",
             padding: "8px 16px",
-            background: C.brand,
+            background: C.ink,
             color: "#fff",
-            borderRadius: 8,
+            borderRadius: R.sm,
             fontSize: 13,
             fontWeight: 600,
           }}
@@ -162,7 +161,7 @@ export function AddPanel({
           Add to queue
         </button>
         <span style={{ fontSize: 12, color: C.soft, alignSelf: "center" }}>
-          Then hit <b style={{ color: C.ink }}>Run shift</b> — the agent picks it up on its own.
+          Then hit <b style={{ color: C.ink }}>Run shift</b> - the agent picks it up on its own.
         </span>
       </div>
     </div>

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
-import { C, MONO } from "../theme";
+import { C, MONO, R, SHADOW } from "../theme";
 import type { AuditEntry, AuditKind } from "../types";
 import { Eyebrow } from "./shared";
 
@@ -25,13 +25,23 @@ const FILTERS: { label: string; match: (k: AuditKind) => boolean }[] = [
   { label: "Escalations", match: (k) => k === "escalated" || k === "guardrail" || k === "error" },
 ];
 
-export function AuditTrail({ log }: { log: AuditEntry[] }) {
+export function AuditTrail({
+  log,
+  onExport,
+  registerExport,
+}: {
+  log: AuditEntry[];
+  onExport?: () => void;
+  registerExport?: (fn: () => void) => void;
+}) {
   const [filter, setFilter] = useState(0);
   const shown = log.filter((e) => FILTERS[filter].match(e.kind));
 
   const exportLog = () => {
+    if (log.length === 0) return;
+    onExport?.();
     const payload = {
-      product: "Recover — autonomous recovery employee",
+      product: "Recover - autonomous recovery employee",
       exported_at: new Date().toISOString(),
       total_entries: log.length,
       entries: log
@@ -48,13 +58,19 @@ export function AuditTrail({ log }: { log: AuditEntry[] }) {
     URL.revokeObjectURL(url);
   };
 
+  // expose export so the command palette can trigger it
+  useEffect(() => {
+    registerExport?.(exportLog);
+  });
+
   return (
     <div
       style={{
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 18,
+        borderRadius: R.lg,
         padding: 18,
+        boxShadow: SHADOW,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -154,7 +170,7 @@ export function AuditTrail({ log }: { log: AuditEntry[] }) {
             />
             <span style={{ fontSize: 12.5, color: C.ink, lineHeight: 1.45 }}>
               <b style={{ fontWeight: 600 }}>{e.who}</b>{" "}
-              <span style={{ color: C.soft }}>— {e.text}</span>
+              <span style={{ color: C.soft }}>- {e.text}</span>
             </span>
           </div>
         ))}

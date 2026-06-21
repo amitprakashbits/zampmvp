@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, X, Sparkles } from "lucide-react";
-import { C, MONO, SANS } from "../theme";
+import { Send, X, MessageSquare } from "lucide-react";
+import { C, MONO, R, SANS, SHADOW, SHADOW_POP } from "../theme";
 import type { ChatAction, ChatMessage, RunMode } from "../types";
 import type { ChatReply } from "../lib/chat";
 import { sleep, stamp } from "../lib/utils";
@@ -45,14 +45,17 @@ function Typing() {
 
 export function ChatPanel({
   mode,
+  open,
+  onOpenChange,
   respond,
   onAction,
 }: {
   mode: RunMode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   respond: (message: string, history: ChatMessage[]) => Promise<ChatReply>;
   onAction: (action: ChatAction) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -61,7 +64,7 @@ export function ChatPanel({
       role: "agent",
       ts: stamp(),
       text:
-        "Hi — I'm Recover. I'm already set up to work your queue of stalled users. Delegate to me (\"run the shift\", \"simulate outcomes\", \"go live\") or ask me about any call I've made.",
+        "Hi - I'm Recover. I'm already set up to work your queue of stalled users. Delegate to me (\"run the shift\", \"simulate outcomes\", \"go live\") or ask me about any call I've made.",
     },
   ]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -94,7 +97,7 @@ export function ChatPanel({
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => onOpenChange(true)}
         style={{
           all: "unset",
           cursor: "pointer",
@@ -104,41 +107,19 @@ export function ChatPanel({
           zIndex: 60,
           display: "inline-flex",
           alignItems: "center",
-          gap: 9,
-          padding: "12px 18px",
+          gap: 8,
+          padding: "11px 16px",
           background: C.ink,
           color: "#fff",
-          borderRadius: 99,
-          fontFamily: MONO,
+          borderRadius: R.pill,
           fontSize: 13,
           fontWeight: 600,
-          boxShadow: "0 18px 40px -16px rgba(91,51,224,0.7)",
+          boxShadow: SHADOW_POP,
         }}
       >
-        <span
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: 6,
-            background: "linear-gradient(135deg, #5B33E0, #2F6BFF)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Sparkles size={13} color="#fff" />
-        </span>
+        <MessageSquare size={15} strokeWidth={2} />
         Ask Recover
-        <span
-          style={{
-            width: 7,
-            height: 7,
-            borderRadius: 99,
-            background: "#3FCB6B",
-            boxShadow: "0 0 0 0 rgba(63,203,107,0.6)",
-            animation: "rcv-ping 1.6s ease-out infinite",
-          }}
-        />
+        <span style={{ marginLeft: 2, fontFamily: MONO, fontSize: 10, color: "rgba(255,255,255,0.55)" }}>⌘K</span>
       </button>
     );
   }
@@ -156,8 +137,8 @@ export function ChatPanel({
         zIndex: 60,
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 22,
-        boxShadow: "0 40px 90px -30px rgba(10,10,10,0.55)",
+        borderRadius: R.lg,
+        boxShadow: SHADOW_POP,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
@@ -165,8 +146,7 @@ export function ChatPanel({
         animation: "rcv-rise 0.26s ease",
       }}
     >
-      {/* gradient accent strip */}
-      <div style={{ height: 3, background: "linear-gradient(90deg, #5B33E0, #2F6BFF, #1F8A4C)" }} />
+      <div style={{ height: 2, background: C.accent }} />
 
       {/* header */}
       <div
@@ -209,7 +189,7 @@ export function ChatPanel({
           </div>
         </div>
         <button
-          onClick={() => setOpen(false)}
+          onClick={() => onOpenChange(false)}
           style={{ all: "unset", cursor: "pointer", color: C.faint, display: "flex", padding: 4 }}
         >
           <X size={18} />
@@ -241,12 +221,12 @@ export function ChatPanel({
                 color: isUser ? "#fff" : C.ink,
                 border: isUser ? "none" : `1px solid ${C.line}`,
                 borderLeft: mm.action ? `3px solid ${C.brand}` : undefined,
-                borderRadius: 14,
+                borderRadius: R.md,
                 padding: "10px 13px",
                 fontSize: 13.5,
                 lineHeight: 1.5,
                 whiteSpace: "pre-wrap",
-                boxShadow: isUser ? "none" : "0 1px 2px rgba(10,10,10,0.04)",
+                boxShadow: isUser ? "none" : SHADOW,
               }}
             >
               {mm.action && (
@@ -273,7 +253,7 @@ export function ChatPanel({
               alignSelf: "flex-start",
               background: C.surface,
               border: `1px solid ${C.line}`,
-              borderRadius: 14,
+              borderRadius: R.md,
             }}
           >
             <Typing />
@@ -325,9 +305,9 @@ export function ChatPanel({
             flex: 1,
             maxHeight: 96,
             overflowY: "auto",
-            background: C.paper,
+            background: C.surfaceAlt,
             border: `1px solid ${C.line}`,
-            borderRadius: 12,
+            borderRadius: R.sm,
             padding: "10px 12px",
             fontSize: 13.5,
             lineHeight: 1.4,
@@ -345,7 +325,7 @@ export function ChatPanel({
             opacity: typing || !input.trim() ? 0.4 : 1,
             width: 40,
             height: 40,
-            borderRadius: 12,
+            borderRadius: R.sm,
             background: C.ink,
             display: "flex",
             alignItems: "center",

@@ -2,7 +2,7 @@ import type { Channel, DispatchRecord, RunMode } from "../types";
 import { stamp } from "./utils";
 
 export interface OutreachPayload {
-  channel: Channel | "—";
+  channel: Channel | "-";
   message: string;
 }
 
@@ -10,10 +10,10 @@ export interface OutreachPayload {
    The single send seam. EVERY outbound action funnels through here.
 
    • SHADOW mode (default): the agent makes the real decision but does NOT
-     send. We return a "would_send" record carrying the exact payload — a
+     send. We return a "would_send" record carrying the exact payload - a
      deliberate dry-run for safe rollout, not a fake.
 
-   • LIVE mode: control passes to `liveSend()` below — the one place a real
+   • LIVE mode: control passes to `liveSend()` below - the one place a real
      Twilio / WhatsApp / email integration plugs in. It is currently a
      well-marked stub that does NOT actually send anything.
    ──────────────────────────────────────────────────────────────────────── */
@@ -62,7 +62,7 @@ async function liveSend(payload: OutreachPayload): Promise<DispatchRecord> {
   // TODO: integrate Twilio (Call/WhatsApp) + SES/SendGrid (Email) here.
   // eslint-disable-next-line no-console
   console.warn(
-    "[dispatch] LIVE mode is a stub — no real send is wired up. Payload:",
+    "[dispatch] LIVE mode is a stub - no real send is wired up. Payload:",
     payload,
   );
   return {

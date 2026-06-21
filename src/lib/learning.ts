@@ -11,7 +11,7 @@ import {
 /* ────────────────────────────────────────────────────────────────────────
    The outcome feedback loop. The agent keeps a running tally of which channel
    recovers which kind of drop-off, and lets that shift future channel picks.
-   This is intentionally simple and legible — a viewer can read the stats and
+   This is intentionally simple and legible - a viewer can read the stats and
    predict the agent's next move.
    ──────────────────────────────────────────────────────────────────────── */
 
@@ -58,7 +58,7 @@ export function applyLearning(
   user: User,
   learning: LearningStats,
 ): AgentDecision {
-  if (decision.action !== "ACT" || decision.channel === "—") return decision;
+  if (decision.action !== "ACT" || decision.channel === "-") return decision;
 
   const reason = user.dropOff;
   const best = bestChannel(learning, reason);
@@ -103,10 +103,10 @@ export function applyLearning(
 export function recordOutcome(
   learning: LearningStats,
   reason: string,
-  channel: Channel | "—",
+  channel: Channel | "-",
   outcome: OutcomeKind,
 ): LearningStats {
-  if (channel === "—") return learning;
+  if (channel === "-") return learning;
   const prev = learning[reason]?.[channel] ?? EMPTY;
   const next: ChannelStat = {
     acted: prev.acted + (outcome === "converted_anyway" ? 0 : 1),
@@ -133,7 +133,7 @@ export function learningPromptSummary(learning: LearningStats): string {
   }
   return lines.length
     ? lines.join("\n")
-    : "(no outcome history yet — use channel preference and judgement)";
+    : "(no outcome history yet - use channel preference and judgement)";
 }
 
 /* ── view model for the "What the agent has learned" panel ─────────────── */

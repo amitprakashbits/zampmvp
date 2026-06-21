@@ -1,5 +1,5 @@
-import { Plus, RotateCcw, Zap, Beaker, ArrowRight } from "lucide-react";
-import { C, MONO } from "../theme";
+import { Plus, RotateCcw, Zap, Beaker, ArrowRight, Command } from "lucide-react";
+import { C, MONO, R } from "../theme";
 import type { RunMode } from "../types";
 import { Dot } from "./shared";
 
@@ -9,7 +9,7 @@ const pill = {
   alignItems: "center",
   gap: 6,
   padding: "9px 14px",
-  borderRadius: 99,
+  borderRadius: R.pill,
   fontFamily: MONO,
   fontSize: 12,
   fontWeight: 500,
@@ -34,7 +34,7 @@ function ModeToggle({
         title={
           m === "shadow"
             ? "Dry-run: the agent decides everything but never sends."
-            : "Live: routes through the real dispatch seam (stubbed — still won't send)."
+            : "Live: routes through the real dispatch seam (stubbed - still won't send)."
         }
         style={{
           all: "unset",
@@ -45,7 +45,7 @@ function ModeToggle({
           fontSize: 12,
           fontWeight: 500,
           color: active ? "#fff" : C.soft,
-          background: active ? (m === "shadow" ? C.brand : C.actioned) : "transparent",
+          background: active ? (m === "shadow" ? C.ink : C.accent) : "transparent",
           display: "inline-flex",
           alignItems: "center",
           gap: 5,
@@ -86,6 +86,7 @@ export function TopBar({
   onRunShift,
   onSimulate,
   canSimulate,
+  onOpenCommand,
 }: {
   running: boolean;
   phase: string;
@@ -97,6 +98,7 @@ export function TopBar({
   onRunShift: () => void;
   onSimulate: () => void;
   canSimulate: boolean;
+  onOpenCommand: () => void;
 }) {
   return (
     <div
@@ -105,15 +107,15 @@ export function TopBar({
         alignItems: "center",
         gap: 10,
         flexWrap: "wrap",
-        marginBottom: 16,
+        marginBottom: 14,
         position: "sticky",
         top: 10,
         zIndex: 20,
-        background: "rgba(239,239,237,0.82)",
+        background: "rgba(246,246,244,0.85)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
         padding: "8px 10px",
-        borderRadius: 99,
+        borderRadius: R.pill,
         border: `1px solid ${C.line}`,
       }}
     >
@@ -129,14 +131,22 @@ export function TopBar({
           }}
         >
           {running
-            ? `on shift — ${(phase || "working the queue").toLowerCase()}`
+            ? `on shift - ${(phase || "working the queue").toLowerCase()}`
             : inboxCount
-              ? "off shift — queue waiting"
-              : "off shift — queue clear"}
+              ? "off shift - queue waiting"
+              : "off shift - queue clear"}
         </span>
       </div>
 
       <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button
+          onClick={onOpenCommand}
+          title="Command palette (⌘K)"
+          style={{ ...pill, cursor: "pointer", background: C.surface, border: `1px solid ${C.line}`, color: C.soft }}
+        >
+          <Command size={13} /> ⌘K
+        </button>
+
         <ModeToggle mode={mode} onToggle={onToggleMode} disabled={running} />
 
         <button

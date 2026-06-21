@@ -6,8 +6,8 @@ import { sleep } from "./utils";
 
 /* ────────────────────────────────────────────────────────────────────────
    The agent's reasoning. Two interchangeable backends behind one call:
-     • LIVE  — claude-sonnet-4-6 via the Anthropic API (needs a key).
-     • MOCK  — deterministic local rules (zero setup; default).
+     • LIVE  - claude-sonnet-4-6 via the Anthropic API (needs a key).
+     • MOCK  - deterministic local rules (zero setup; default).
    Both return the SAME shape; the learning layer is applied on top in App.
    ──────────────────────────────────────────────────────────────────────── */
 
@@ -32,8 +32,8 @@ export function parseAgentJSON(text: string): AgentDecision {
   if (!["ACT", "ESCALATE", "SKIP"].includes(action)) {
     throw new Error("bad action: " + action);
   }
-  let channel = String(obj.channel || "").trim() as Channel | "—";
-  if (!CHANNELS.includes(channel as Channel)) channel = "—";
+  let channel = String(obj.channel || "").trim() as Channel | "-";
+  if (!CHANNELS.includes(channel as Channel)) channel = "-";
 
   let confidence = Number(obj.confidence);
   if (!Number.isFinite(confidence)) confidence = 0.7;
@@ -59,7 +59,7 @@ function buildPrompt(user: User, learning: LearningStats): string {
     estimated_account_value_usd: user.value,
   };
 
-  return `You are an autonomous recovery agent working a conversion funnel for a US-stock investing app. You own one number: recovered revenue. You work a queue of stalled users one at a time and decide the single best next move for each — no human prompts you.
+  return `You are an autonomous recovery agent working a conversion funnel for a US-stock investing app. You own one number: recovered revenue. You work a queue of stalled users one at a time and decide the single best next move for each - no human prompts you.
 
 You also LEARN from outcomes. Here is what recent outcomes show about which channel recovers which drop-off reason (recovery rate and sample size):
 ${learningPromptSummary(learning)}
@@ -67,15 +67,15 @@ ${learningPromptSummary(learning)}
 Use this evidence when choosing a channel: prefer the channel that has been recovering this kind of drop-off best, and say so in your reasoning when the evidence is meaningful. Otherwise respect the user's channel preference.
 
 For the user below, decide:
-1. root_cause — the most likely specific reason they stalled (never just "they dropped off").
-2. channel — exactly one of "Call", "WhatsApp", "Email".
-3. action — exactly one of "ACT", "ESCALATE", "SKIP".
+1. root_cause - the most likely specific reason they stalled (never just "they dropped off").
+2. channel - exactly one of "Call", "WhatsApp", "Email".
+3. action - exactly one of "ACT", "ESCALATE", "SKIP".
    • ACT = reach out now on the chosen channel.
    • ESCALATE = hand to a human when the case is ambiguous, high-value and sensitive, negative-sentiment, or when a templated outreach is the wrong move.
    • SKIP = the user has very likely ALREADY converted or is actively converting right now (e.g. active minutes ago, on the funding screen, just linked a bank). Do NOT spend an outreach chasing a recovery already in motion. A disciplined skip beats a wasted touch and a vanity recovery.
-4. reasoning — 1–2 tight sentences a teammate could audit; reference the learned evidence if it influenced the channel.
-5. draft_message — the actual personalized outreach copy for the chosen channel, in the user's name, short and human. Empty string if action is SKIP.
-6. confidence — your confidence in this decision as a number from 0 to 1 (two decimals). Be honest: lower it when the case is ambiguous or the signals are thin.
+4. reasoning - 1-2 tight sentences a teammate could audit; reference the learned evidence if it influenced the channel.
+5. draft_message - the actual personalized outreach copy for the chosen channel, in the user's name, short and human. Empty string if action is SKIP.
+6. confidence - your confidence in this decision as a number from 0 to 1 (two decimals). Be honest: lower it when the case is ambiguous or the signals are thin.
 
 User profile:
 ${JSON.stringify(profile, null, 2)}

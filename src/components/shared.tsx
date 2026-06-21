@@ -1,6 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Phone, Mail, MessageCircle, ChevronDown } from "lucide-react";
-import { C, MONO } from "../theme";
+import { C, MONO, R, SHADOW } from "../theme";
 import type { Channel } from "../types";
 import { money } from "../lib/utils";
 
@@ -61,8 +61,8 @@ export const Chip = ({ children }: { children: ReactNode }) => (
   </span>
 );
 
-export function ChannelTag({ channel }: { channel?: Channel | "—" }) {
-  if (!channel || channel === "—") return null;
+export function ChannelTag({ channel }: { channel?: Channel | "-" }) {
+  if (!channel || channel === "-") return null;
   const Icon = CHANNEL_ICON[channel];
   return (
     <span
@@ -138,13 +138,11 @@ export function CardShell({
         position: "relative",
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderLeft: `3px solid ${accent}`,
-        borderRadius: 13,
+        borderLeft: `2px solid ${accent}`,
+        borderRadius: R.md,
         padding: 12,
-        animation: "rcv-in 0.28s ease",
-        boxShadow: glow
-          ? `0 0 0 1px ${accent}40, 0 16px 40px -16px ${accent}99`
-          : "0 1px 2px rgba(10,10,10,0.03)",
+        animation: "rcv-in 0.24s ease",
+        boxShadow: glow ? `0 0 0 1px ${accent}33, ${SHADOW}` : SHADOW,
       }}
     >
       {children}
@@ -168,7 +166,7 @@ export function DraftToggle({
   label = "draft",
 }: {
   message?: string;
-  channel?: Channel | "—";
+  channel?: Channel | "-";
   accent: string;
   label?: string;
 }) {

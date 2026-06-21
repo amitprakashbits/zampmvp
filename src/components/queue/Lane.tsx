@@ -27,6 +27,7 @@ export function Lane({
   lane,
   items,
   phase,
+  ranks,
   onApprove,
   onOverride,
   onOutcome,
@@ -34,6 +35,7 @@ export function Lane({
   lane: LaneDef;
   items: User[];
   phase: string;
+  ranks: Record<string, number>;
   onApprove: (u: User) => void;
   onOverride: (u: User) => void;
   onOutcome: (u: User, outcome: OutcomeKind) => void;
@@ -88,7 +90,7 @@ export function Lane({
           <div style={{ fontSize: 12, color: C.faint, padding: "10px 2px" }}>{EMPTY[lane.key]}</div>
         )}
         {items.map((u) => {
-          if (lane.key === "inbox") return <InboxCard key={u.id} u={u} />;
+          if (lane.key === "inbox") return <InboxCard key={u.id} u={u} rank={ranks[u.id]} />;
           if (lane.key === "processing") return <ProcessingCard key={u.id} u={u} phase={phase} />;
           if (lane.key === "actioned")
             return (

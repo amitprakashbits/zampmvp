@@ -25,14 +25,14 @@ export type OutcomeKind = "recovered" | "ignored" | "converted_anyway";
 /** A single decision returned by the agent (live LLM or mock), post-parse. */
 export interface AgentDecision {
   root_cause: string;
-  channel: Channel | "—";
+  channel: Channel | "-";
   action: ActionKind;
   reasoning: string;
   draft_message: string;
-  /** The agent's self-assessed confidence in this decision, 0–1. */
+  /** The agent's self-assessed confidence in this decision, 0-1. */
   confidence: number;
   /** Channel before the learning layer shifted it, if it did. */
-  base_channel?: Channel | "—";
+  base_channel?: Channel | "-";
   /** Human-readable note explaining a learning-driven channel shift / confirmation. */
   learning_note?: string;
   /** Set when an operator guardrail overrode the decision (ACT → ESCALATE). */
@@ -49,14 +49,17 @@ export interface Policy {
   escalateNegativeSentiment: boolean;
   /** Minimum decision confidence to auto-act; below this → escalate. */
   minConfidence: number;
+  /** % of ACT-eligible users held back as an untouched control, to measure
+   *  true incremental lift (vs. taking credit for users who'd convert anyway). */
+  holdoutPct: number;
 }
 
 /** What the agent would (shadow) or did (live stub) dispatch. */
 export interface DispatchRecord {
-  channel: Channel | "—";
+  channel: Channel | "-";
   message: string;
   mode: RunMode;
-  status: "would_send" | "sent" | "noop";
+  status: "would_send" | "sent" | "noop" | "held_out";
   at: string;
 }
 
@@ -75,6 +78,8 @@ export interface User {
   resolvedBy: "approved" | "overridden" | null;
   dispatch: DispatchRecord | null;
   outcome: OutcomeKind | null;
+  /** Held back as an untouched control to measure incremental lift (ACT users only). */
+  heldOut?: boolean;
 }
 
 /** Raw user fields a human can add from the UI. */
@@ -135,4 +140,6 @@ export type ChatAction =
   | { type: "simulate" }
   | { type: "set_mode"; mode: RunMode }
   | { type: "set_policy"; patch: Partial<Policy> }
+  | { type: "add_user" }
+  | { type: "open_command" }
   | { type: "reset" };

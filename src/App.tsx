@@ -1,6 +1,16 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Inbox as InboxIcon } from "lucide-react";
-import { C, LANES, SANS } from "./theme";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Inbox as InboxIcon,
+  Zap,
+  Beaker,
+  Plus,
+  RotateCcw,
+  Download,
+  MessageSquare,
+  Eye,
+  Compass,
+} from "lucide-react";
+import { C, LANES, MONO, R, SANS, SHADOW } from "./theme";
 import type {
   AgentDecision,
   AuditEntry,
@@ -19,6 +29,7 @@ import { fresh, seedLearning } from "./lib/seed";
 import { API_MODE, getDecision } from "./lib/agent";
 import { applyLearning, recordOutcome as foldOutcome } from "./lib/learning";
 import { applyGuardrails, DEFAULT_POLICY } from "./lib/guardrails";
+import { computeLift, nextInQueue, triageRank } from "./lib/insights";
 import { dispatchOutreach } from "./lib/dispatch";
 import { money, sleep, stamp, useCountUp } from "./lib/utils";
 import { Hero } from "./components/Hero";
@@ -30,6 +41,9 @@ import { AuditTrail } from "./components/AuditTrail";
 import { LearningPanel } from "./components/LearningPanel";
 import { GuardrailsPanel } from "./components/GuardrailsPanel";
 import { ChatPanel } from "./components/ChatPanel";
+import { CommandPalette, type Command } from "./components/CommandPalette";
+import { Onboarding, Checklist, type ChecklistState } from "./components/Onboarding";
+import { BootSkeleton } from "./components/Skeleton";
 import { respondToChat, type ChatContext } from "./lib/chat";
 
 const PROC_STEPS = [
@@ -39,6 +53,9 @@ const PROC_STEPS = [
   "Drafting outreach",
   "Logging decision",
 ];
+
+/** How much an outreach lifts comeback odds for a contacted user (vs control). */
+const TOUCH_UPLIFT = 0.2;
 
 export default function App() {
   const [users, setUsers] = useState<User[]>(fresh);
@@ -51,6 +68,23 @@ export default function App() {
   const [mode, setModeState] = useState<RunMode>("shadow");
   const [learning, setLearning] = useState<LearningStats>(seedLearning);
   const [policy, setPolicyState] = useState<Policy>(DEFAULT_POLICY);
+
+  // screen / surface state
+  const [booting, setBooting] = useState(true);
+  const [onboarding, setOnboarding] = useState(true);
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [checklist, setChecklist] = useState<ChecklistState>({
+    ranShift: false,
+    recordedOutcome: false,
+    tunedGuardrail: false,
+    usedAssistant: false,
+    exportedAudit: false,
+  });
+  const [checklistDismissed, setChecklistDismissed] = useState(false);
+  const mark = useCallback((k: keyof ChecklistState) => {
+    setChecklist((c) => (c[k] ? c : { ...c, [k]: true }));
+  }, []);
 
   // Refs mirror state so the async queue worker reads current values mid-shift.
   const usersRef = useRef(users);
@@ -76,6 +110,18 @@ export default function App() {
     policyRef.current = next;
     setPolicyState(next);
   }, []);
+  // operator-initiated policy change (also advances the activation checklist)
+  const tunePolicy = useCallback(
+    (next: Policy) => {
+      setPolicy(next);
+      mark("tunedGuardrail");
+    },
+    [setPolicy, mark],
+  );
+
+  // holdout accounting per shift (largest-remainder so small queues still hold ~holdoutPct)
+  const actSeqRef = useRef(0);
+  const heldSeqRef = useRef(0);
 
   const patch = useCallback(
     (id: string, p: Partial<User>) => {
@@ -87,6 +133,25 @@ export default function App() {
   const audit = useCallback((who: string, text: string, kind: AuditKind) => {
     setLog((l) => [{ time: stamp(), who, text, kind }, ...l]);
   }, []);
+
+  /* boot: brief skeleton so the first paint feels like a real dashboard load */
+  useEffect(() => {
+    const t = setTimeout(() => setBooting(false), 780);
+    return () => clearTimeout(t);
+  }, []);
+
+  /* global Cmd/Ctrl-K command palette */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdOpen((o) => !o);
+        mark("usedAssistant");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mark]);
 
   /* ── process one user end-to-end ──────────────────────────────────── */
   const processOne = useCallback(
@@ -111,10 +176,9 @@ export default function App() {
       setTimes((t) => [...t, (performance.now() - t0) / 1000]);
 
       if (errored || !base) {
-        // Fail safe to a human rather than dropping the user.
         const result: AgentDecision = {
           root_cause: "Automated diagnosis unavailable",
-          channel: "—",
+          channel: "-",
           action: "ESCALATE",
           reasoning:
             "The agent couldn't reach a confident decision (API or parse error), so it routed this user to a human instead of dropping them.",
@@ -127,17 +191,16 @@ export default function App() {
         return;
       }
 
-      // Learning layer may shift the channel; then operator guardrails may
-      // override an ACT into an escalation.
+      // learning may shift the channel; guardrails may force an escalation.
       const learned = applyLearning(base, user, learningRef.current);
       const result = applyGuardrails(learned, user, policyRef.current);
-      audit(user.name, `diagnosed — ${result.root_cause} (confidence ${result.confidence.toFixed(2)})`, "diagnosed");
+      audit(user.name, `diagnosed - ${result.root_cause} (confidence ${result.confidence.toFixed(2)})`, "diagnosed");
       if (result.learning_note) audit(user.name, result.learning_note, "learning");
       if (result.guardrail) audit(user.name, `guardrail → ${result.guardrail}`, "guardrail");
 
       if (result.action === "SKIP") {
         patch(user.id, { status: "skipped", result });
-        audit(user.name, "skipped — already converting, declined to spend an outreach", "skipped");
+        audit(user.name, "skipped - already converting, declined to spend an outreach", "skipped");
         await sleep(450);
         return;
       }
@@ -148,7 +211,30 @@ export default function App() {
         return;
       }
 
-      // ACT — funnel through the single dispatch seam (shadow = would-send).
+      // ACT - but first decide if this one is held back as an untouched control.
+      actSeqRef.current += 1;
+      const target = Math.round((actSeqRef.current * policyRef.current.holdoutPct) / 100);
+      const heldOut = target > heldSeqRef.current;
+      if (heldOut) heldSeqRef.current += 1;
+
+      if (heldOut) {
+        patch(user.id, {
+          status: "actioned",
+          result,
+          heldOut: true,
+          dispatch: {
+            channel: result.channel,
+            message: result.draft_message,
+            mode: modeRef.current,
+            status: "held_out",
+            at: stamp(),
+          },
+        });
+        audit(user.name, "held out as an untouched control - measuring incremental lift", "actioned");
+        await sleep(420);
+        return;
+      }
+
       const dispatch = await dispatchOutreach(
         { channel: result.channel, message: result.draft_message },
         modeRef.current,
@@ -157,7 +243,7 @@ export default function App() {
       audit(
         user.name,
         modeRef.current === "shadow"
-          ? `would send via ${result.channel} — dry-run, not dispatched`
+          ? `would send via ${result.channel} - dry-run, not dispatched`
           : `dispatched via ${result.channel} (live seam, stubbed)`,
         "actioned",
       );
@@ -170,48 +256,54 @@ export default function App() {
     if (running) return;
     setRunning(true);
     setNote(null);
+    mark("ranShift");
+    actSeqRef.current = 0;
+    heldSeqRef.current = 0;
     for (;;) {
-      const next = usersRef.current.find((u) => u.status === "inbox");
+      const next = nextInQueue(usersRef.current); // triage: highest value-at-risk first
       if (!next) break;
       await processOne(next);
     }
     setRunning(false);
     setPhase("");
-  }, [running, processOne]);
+  }, [running, processOne, mark]);
 
   /* ── outcome feedback loop ────────────────────────────────────────── */
   const applyOutcome = useCallback(
     (user: User, outcome: OutcomeKind) => {
       const result = user.result;
       if (!result) return;
-      const channel = result.channel as Channel | "—";
+      const channel = result.channel as Channel | "-";
       const reason = user.dropOff;
+      mark("recordedOutcome");
 
-      // 1) fold into learning (drives future channel picks)
+      // control users: never contacted - record for the lift calc only.
+      if (user.heldOut) {
+        patch(user.id, { outcome });
+        audit(
+          user.name,
+          outcome === "recovered"
+            ? "control - re-engaged on their own (baseline, not credited to outreach)"
+            : "control - stayed stalled (baseline)",
+          "outcome",
+        );
+        return;
+      }
+
+      // contacted users: fold into learning, move lane, count revenue.
       setLearn(foldOutcome(learningRef.current, reason, channel, outcome));
-
-      // 2) move the user / record the outcome
       if (outcome === "recovered") {
         patch(user.id, { status: "recovered", outcome });
-        audit(
-          user.name,
-          `recovered — re-engaged after ${channel} outreach (+${money(user.value)})`,
-          "outcome",
-        );
+        audit(user.name, `recovered - re-engaged after ${channel} outreach (+${money(user.value)})`, "outcome");
       } else if (outcome === "ignored") {
         patch(user.id, { outcome });
-        audit(user.name, `ignored — no response to ${channel} outreach`, "outcome");
+        audit(user.name, `ignored - no response to ${channel} outreach`, "outcome");
       } else {
         patch(user.id, { outcome });
-        audit(
-          user.name,
-          `converted on their own — ${channel} touch didn't drive it (uncredited)`,
-          "outcome",
-        );
+        audit(user.name, `converted on their own - ${channel} touch didn't drive it (uncredited)`, "outcome");
       }
-      audit(user.name, `learning updated for '${reason}' / ${channel}`, "learning");
     },
-    [patch, audit, setLearn],
+    [patch, audit, setLearn, mark],
   );
 
   const simulateOutcomes = useCallback(() => {
@@ -223,14 +315,18 @@ export default function App() {
     for (const u of pending) {
       const r = Math.random();
       const p = u.propensity ?? 0.5;
-      const outcome: OutcomeKind =
-        r < p ? "recovered" : r < p + 0.15 ? "converted_anyway" : "ignored";
+      let outcome: OutcomeKind;
+      if (u.heldOut) {
+        // control gets no uplift - this is the baseline
+        outcome = r < p ? "recovered" : "ignored";
+      } else {
+        const eff = Math.min(0.97, p + TOUCH_UPLIFT);
+        outcome = r < eff ? "recovered" : r < eff + 0.12 ? "converted_anyway" : "ignored";
+      }
       applyOutcome(u, outcome);
     }
     setNote(
-      `Simulated outcomes for ${pending.length} actioned user${
-        pending.length === 1 ? "" : "s"
-      } — the agent's learning has updated.`,
+      `Simulated outcomes for ${pending.length} user${pending.length === 1 ? "" : "s"} - learning and incremental lift updated.`,
     );
   }, [applyOutcome]);
 
@@ -238,15 +334,15 @@ export default function App() {
   const approve = useCallback(
     async (u: User) => {
       const dispatch = await dispatchOutreach(
-        { channel: u.result?.channel ?? "—", message: u.result?.draft_message ?? "" },
+        { channel: u.result?.channel ?? "-", message: u.result?.draft_message ?? "" },
         modeRef.current,
       );
       patch(u.id, { status: "actioned", resolvedBy: "approved", dispatch });
       audit(
         u.name,
         modeRef.current === "shadow"
-          ? `human approved — would send via ${u.result?.channel ?? "chosen channel"} (shadow)`
-          : `human approved — dispatched via ${u.result?.channel ?? "chosen channel"}`,
+          ? `human approved - would send via ${u.result?.channel ?? "chosen channel"} (shadow)`
+          : `human approved - dispatched via ${u.result?.channel ?? "chosen channel"}`,
         "human",
       );
     },
@@ -256,7 +352,7 @@ export default function App() {
   const override = useCallback(
     (u: User) => {
       patch(u.id, { status: "escalated", resolvedBy: "overridden" });
-      audit(u.name, "human overrode the escalation — closed without outreach", "human");
+      audit(u.name, "human overrode the escalation - closed without outreach", "human");
     },
     [patch, audit],
   );
@@ -275,7 +371,7 @@ export default function App() {
       };
       setU((us) => [...us, u]);
       setShowAdd(false);
-      setNote(`${u.name} added to the inbox — run the shift to let the agent take it.`);
+      setNote(`${u.name} added to the inbox - run the shift to let the agent take it.`);
     },
     [setU],
   );
@@ -291,20 +387,20 @@ export default function App() {
     setShowAdd(false);
   }, [setU, setLearn]);
 
-  /* ── metrics ──────────────────────────────────────────────────────── */
+  /* ── metrics + insights ───────────────────────────────────────────── */
   const m: Metrics = useMemo(() => {
     const by = (s: User["status"]) => users.filter((u) => u.status === s).length;
     const actioned = by("actioned");
     const recovered = by("recovered");
     const escalated = by("escalated");
     const skipped = by("skipped");
-    const acted = actioned + recovered; // recovered users were acted on
+    const acted = actioned + recovered;
     const decided = acted + escalated + skipped;
     const decisionBase = acted + escalated;
     const autoPct = decisionBase ? Math.round((acted / decisionBase) * 100) : 0;
     const escPct = decisionBase ? 100 - autoPct : 0;
     const revenue = users
-      .filter((u) => u.status === "recovered")
+      .filter((u) => u.status === "recovered" && !u.heldOut)
       .reduce((s, u) => s + u.value, 0);
     const atRisk = users
       .filter(
@@ -316,26 +412,12 @@ export default function App() {
       )
       .reduce((s, u) => s + u.value, 0);
     const avg = times.length ? times.reduce((a, b) => a + b, 0) / times.length : 0;
-    return {
-      acted,
-      recovered,
-      escalated,
-      skipped,
-      decided,
-      total: users.length,
-      autoPct,
-      escPct,
-      revenue,
-      atRisk,
-      avg,
-    };
+    return { acted, recovered, escalated, skipped, decided, total: users.length, autoPct, escPct, revenue, atRisk, avg };
   }, [users, times]);
 
-  const guardrailsFired = useMemo(
-    () => users.filter((u) => u.result?.guardrail).length,
-    [users],
-  );
-
+  const lift = useMemo(() => computeLift(users), [users]);
+  const ranks = useMemo(() => triageRank(users), [users]);
+  const guardrailsFired = useMemo(() => users.filter((u) => u.result?.guardrail).length, [users]);
   const revDisplay = useCountUp(m.revenue);
 
   const lanes = useMemo(() => {
@@ -351,18 +433,8 @@ export default function App() {
   const canSimulate = users.some((u) => u.status === "actioned" && !u.outcome);
 
   /* ── chat / delegation surface ────────────────────────────────────── */
-  // Plain closures (not memoised) so they always read the latest state when
-  // the user sends a message.
   const chatRespond = (message: string, history: ChatMessage[]) => {
-    const ctx: ChatContext = {
-      mode,
-      apiMode: API_MODE,
-      metrics: m,
-      inbox: inboxCount,
-      users,
-      learning,
-      policy,
-    };
+    const ctx: ChatContext = { mode, apiMode: API_MODE, metrics: m, inbox: inboxCount, users, learning, policy };
     return respondToChat(message, ctx, history);
   };
 
@@ -378,7 +450,13 @@ export default function App() {
         setMode(action.mode);
         break;
       case "set_policy":
-        setPolicy({ ...policyRef.current, ...action.patch });
+        tunePolicy({ ...policyRef.current, ...action.patch });
+        break;
+      case "add_user":
+        setShowAdd(true);
+        break;
+      case "open_command":
+        setCmdOpen(true);
         break;
       case "reset":
         reset();
@@ -386,172 +464,191 @@ export default function App() {
     }
   };
 
+  /* ── command palette ──────────────────────────────────────────────── */
+  const commands: Command[] = [
+    { id: "run", label: "Run shift", group: "Agent", icon: Zap, hint: inboxCount ? `${inboxCount}` : undefined, keywords: "work queue start", disabled: running || inboxCount === 0, run: () => void runShift() },
+    { id: "sim", label: "Simulate outcomes", group: "Agent", icon: Beaker, keywords: "record results lift", disabled: running || !canSimulate, run: simulateOutcomes },
+    { id: "mode", label: mode === "shadow" ? "Switch to Live mode" : "Switch to Shadow mode", group: "Agent", icon: Eye, keywords: "dry run send dispatch", disabled: running, run: () => setMode(mode === "shadow" ? "live" : "shadow") },
+    { id: "add", label: "Add a stalled user", group: "Queue", icon: Plus, keywords: "new user", disabled: running, run: () => setShowAdd(true) },
+    { id: "assistant", label: "Open the assistant", group: "Help", icon: MessageSquare, keywords: "chat ask delegate", run: () => { setChatOpen(true); mark("usedAssistant"); } },
+    { id: "export", label: "Export audit log", group: "Audit", icon: Download, keywords: "download json compliance", disabled: log.length === 0, run: () => { exportRef.current?.(); } },
+    { id: "tour", label: "Restart the tour", group: "Help", icon: Compass, keywords: "onboarding guide help", run: () => setOnboarding(true) },
+    { id: "reset", label: "Reset the shift", group: "Agent", icon: RotateCcw, keywords: "clear start over", disabled: running, run: reset },
+  ];
+  const exportRef = useRef<(() => void) | null>(null);
+
+  const showChecklist = !checklistDismissed && !booting && !onboarding;
+
   return (
     <div
       style={{
         minHeight: "100vh",
         backgroundColor: C.paper,
-        backgroundImage: `
-          radial-gradient(900px circle at 6% -8%, rgba(91,51,224,0.13), transparent 42%),
-          radial-gradient(820px circle at 102% 108%, rgba(47,107,255,0.11), transparent 44%),
-          radial-gradient(rgba(10,10,10,0.05) 1px, transparent 1px)
-        `,
-        backgroundSize: "100% 100%, 100% 100%, 22px 22px",
-        backgroundAttachment: "fixed, fixed, fixed",
+        backgroundImage: "radial-gradient(rgba(22,23,27,0.035) 1px, transparent 1px)",
+        backgroundSize: "22px 22px",
+        backgroundAttachment: "fixed",
         fontFamily: SANS,
         color: C.ink,
         WebkitFontSmoothing: "antialiased",
       }}
     >
       <style>{`
-        @keyframes rcv-ping { 0%{transform:scale(1);opacity:.55} 70%,100%{transform:scale(2.6);opacity:0} }
+        @keyframes rcv-ping { 0%{transform:scale(1);opacity:.5} 70%,100%{transform:scale(2.4);opacity:0} }
         @keyframes rcv-in { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
-        @keyframes rcv-rise { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+        @keyframes rcv-rise { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+        @keyframes rcv-fade { from{opacity:0} to{opacity:1} }
+        @keyframes rcv-pop { from{opacity:0;transform:translateY(-4px) scale(.99)} to{opacity:1;transform:none} }
         @keyframes rcv-blink { 0%,50%{opacity:1} 50.01%,100%{opacity:0} }
-        @keyframes rcv-drift { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(26px,-22px) scale(1.12)} }
-        @keyframes rcv-shimmer { 0%{background-position:-180% 0} 100%{background-position:180% 0} }
-        @keyframes rcv-sheen { 0%{transform:translateX(-120%)} 60%,100%{transform:translateX(320%)} }
-        .rcv-card{ transition: transform .18s ease, box-shadow .22s ease, border-color .18s ease; }
-        .rcv-card:hover{ transform: translateY(-3px); box-shadow: 0 18px 38px -22px rgba(10,10,10,.45); border-color:#D2D2CC; }
+        @keyframes rcv-skel { 0%{opacity:1} 50%{opacity:.55} 100%{opacity:1} }
+        .rcv-skel{ animation: rcv-skel 1.3s ease-in-out infinite; }
+        .rcv-card{ transition: transform .14s ease, box-shadow .18s ease, border-color .14s ease; }
+        .rcv-card:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px -10px rgba(16,17,21,.28); border-color:#D8D8D2; }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
-        ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#D6D6CF;border-radius:8px} ::-webkit-scrollbar-thumb:hover{background:#C2C2B8}
+        ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#DCDCD6;border-radius:8px} ::-webkit-scrollbar-thumb:hover{background:#C8C8C0}
         input::placeholder{color:${C.faint}}
       `}</style>
 
-      <div style={{ maxWidth: 1320, margin: "0 auto", padding: "22px 22px 56px" }}>
-        <Hero apiMode={API_MODE} />
+      {booting ? (
+        <BootSkeleton />
+      ) : (
+        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "22px 22px 64px", animation: "rcv-fade .25s ease" }}>
+          <Hero apiMode={API_MODE} />
 
-        <TopBar
-          running={running}
-          phase={phase}
-          inboxCount={inboxCount}
-          mode={mode}
-          onToggleMode={setMode}
-          onToggleAdd={() => setShowAdd((s) => !s)}
-          onReset={reset}
-          onRunShift={runShift}
-          onSimulate={simulateOutcomes}
-          canSimulate={canSimulate}
-        />
+          <TopBar
+            running={running}
+            phase={phase}
+            inboxCount={inboxCount}
+            mode={mode}
+            onToggleMode={setMode}
+            onToggleAdd={() => setShowAdd((s) => !s)}
+            onReset={reset}
+            onRunShift={runShift}
+            onSimulate={simulateOutcomes}
+            canSimulate={canSimulate}
+            onOpenCommand={() => setCmdOpen(true)}
+          />
 
-        {/* mode banner — frames shadow mode as a deliberate dry-run */}
-        <div
-          style={{
-            background: mode === "shadow" ? "#F3EEFE" : "#EFF4FE",
-            border: `1px solid ${mode === "shadow" ? "#E2D6FB" : "#D7E3FC"}`,
-            color: mode === "shadow" ? C.brand : C.actioned,
-            borderRadius: 9,
-            padding: "9px 13px",
-            fontSize: 12.5,
-            marginBottom: 14,
-            lineHeight: 1.45,
-          }}
-        >
-          {mode === "shadow" ? (
-            <>
-              <b>Shadow mode (dry-run).</b> The agent makes every real decision and shows the exact
-              payload it <i>would</i> dispatch — but nothing is sent. This is the safe rollout
-              posture.
-            </>
-          ) : (
-            <>
-              <b>Live mode.</b> Actions route through the real dispatch seam in{" "}
-              <code style={{ fontFamily: "monospace" }}>lib/dispatch.ts</code> — which is a clearly
-              marked stub (TODO: Twilio / WhatsApp / email). It still does <b>not</b> send anything.
-            </>
-          )}
-        </div>
-
-        {note && (
+          {/* mode banner */}
           <div
             style={{
-              background: "#F3EEFE",
-              border: `1px solid #E2D6FB`,
-              color: C.brand,
-              borderRadius: 9,
+              background: mode === "shadow" ? C.surfaceAlt : C.accentSoft,
+              border: `1px solid ${mode === "shadow" ? C.line : "#D4E2FB"}`,
+              color: mode === "shadow" ? C.soft : C.accent,
+              borderRadius: R.md,
               padding: "9px 13px",
               fontSize: 12.5,
-              marginBottom: 14,
+              marginBottom: 12,
+              lineHeight: 1.45,
             }}
           >
-            {note}
+            {mode === "shadow" ? (
+              <>
+                <b style={{ color: C.ink }}>Shadow mode (dry-run).</b> Every real decision is made and the
+                exact payload it <i>would</i> dispatch is shown - nothing is sent. The safe rollout posture.
+              </>
+            ) : (
+              <>
+                <b>Live mode.</b> Actions route through the single dispatch seam in{" "}
+                <code style={{ fontFamily: MONO }}>lib/dispatch.ts</code> - a clearly marked stub (TODO:
+                Twilio / WhatsApp / email). It still does <b>not</b> send anything.
+              </>
+            )}
           </div>
-        )}
 
-        <Scorecard m={m} revDisplay={revDisplay} />
-
-        {showAdd && <AddPanel onAdd={addUser} onClose={() => setShowAdd(false)} />}
-
-        {/* queue board */}
-        <div
-          style={{
-            background: C.surface,
-            border: `1px solid ${C.line}`,
-            borderRadius: 20,
-            padding: 18,
-            marginBottom: 14,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-            <InboxIcon size={15} color={C.soft} />
-            <span
+          {note && (
+            <div
               style={{
-                fontFamily: "ui-monospace, monospace",
-                fontSize: 10.5,
-                letterSpacing: "0.13em",
-                textTransform: "uppercase",
-                color: C.soft,
+                background: C.accentSoft,
+                border: `1px solid #D4E2FB`,
+                color: C.accent,
+                borderRadius: R.md,
+                padding: "9px 13px",
+                fontSize: 12.5,
+                marginBottom: 12,
               }}
             >
-              Queue · inbox → processing → outcome lanes
-            </span>
+              {note}
+            </div>
+          )}
+
+          <Scorecard m={m} revDisplay={revDisplay} lift={lift} />
+
+          {showAdd && <AddPanel onAdd={addUser} onClose={() => setShowAdd(false)} />}
+
+          {/* queue board */}
+          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, padding: 18, marginBottom: 14, boxShadow: SHADOW }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              <InboxIcon size={15} color={C.soft} />
+              <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: C.soft }}>
+                Queue · inbox → processing → outcome lanes
+              </span>
+              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10.5, color: C.faint }}>
+                triaged by revenue-at-risk
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
+              {LANES.map((lane) => (
+                <Lane
+                  key={lane.key}
+                  lane={lane}
+                  items={lanes[lane.key]}
+                  phase={phase}
+                  ranks={ranks}
+                  onApprove={approve}
+                  onOverride={override}
+                  onOutcome={applyOutcome}
+                />
+              ))}
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
-            {LANES.map((lane) => (
-              <Lane
-                key={lane.key}
-                lane={lane}
-                items={lanes[lane.key]}
-                phase={phase}
-                onApprove={approve}
-                onOverride={override}
-                onOutcome={applyOutcome}
-              />
-            ))}
+
+          {/* guardrails */}
+          <div style={{ marginBottom: 14 }}>
+            <GuardrailsPanel policy={policy} setPolicy={tunePolicy} fired={guardrailsFired} />
+          </div>
+
+          {/* learning + audit */}
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
+            <div style={{ flex: "1 1 360px", minWidth: 320 }}>
+              <LearningPanel learning={learning} />
+            </div>
+            <div style={{ flex: "1 1 360px", minWidth: 320 }}>
+              <AuditTrail log={log} onExport={() => { mark("exportedAudit"); }} registerExport={(fn) => (exportRef.current = fn)} />
+            </div>
+          </div>
+
+          <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: C.faint, fontFamily: MONO, letterSpacing: "0.04em" }}>
+            {API_MODE === "live" ? "Reasoning runs on claude-sonnet-4-6" : "Reasoning runs on built-in deterministic logic"} · decides
+            ACT / ESCALATE / SKIP per user, learns from outcomes, proves its own lift
           </div>
         </div>
+      )}
 
-        {/* guardrails */}
-        <div style={{ marginBottom: 14 }}>
-          <GuardrailsPanel policy={policy} setPolicy={setPolicy} fired={guardrailsFired} />
-        </div>
-
-        {/* learning + audit */}
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
-          <div style={{ flex: "1 1 360px", minWidth: 320 }}>
-            <LearningPanel learning={learning} />
-          </div>
-          <div style={{ flex: "1 1 360px", minWidth: 320 }}>
-            <AuditTrail log={log} />
-          </div>
-        </div>
-
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 20,
-            fontSize: 11.5,
-            color: C.faint,
-            fontFamily: "ui-monospace, monospace",
-            letterSpacing: "0.04em",
+      {!booting && onboarding && (
+        <Onboarding
+          onFinish={(runNow) => {
+            setOnboarding(false);
+            if (runNow) void runShift();
           }}
-        >
-          {API_MODE === "live" ? "Reasoning runs on claude-sonnet-4-6" : "Reasoning runs on built-in mock logic"} · the
-          agent decides ACT / ESCALATE / SKIP per user, learns from outcomes, on its own
-        </div>
-      </div>
+        />
+      )}
 
-      <ChatPanel mode={mode} respond={chatRespond} onAction={runChatAction} />
+      {showChecklist && <Checklist state={checklist} onDismiss={() => setChecklistDismissed(true)} />}
+
+      <CommandPalette open={cmdOpen} onClose={() => setCmdOpen(false)} commands={commands} />
+
+      {!booting && (
+        <ChatPanel
+          mode={mode}
+          open={chatOpen}
+          onOpenChange={(o) => {
+            setChatOpen(o);
+            if (o) mark("usedAssistant");
+          }}
+          respond={chatRespond}
+          onAction={runChatAction}
+        />
+      )}
     </div>
   );
 }

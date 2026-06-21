@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { Clock, TrendingUp, SkipForward, Layers } from "lucide-react";
-import { C, MONO } from "../theme";
+import { C, MONO, R, SHADOW } from "../theme";
 import { money } from "../lib/utils";
+import type { Lift } from "../lib/insights";
 
 export interface Metrics {
   acted: number;
@@ -17,196 +17,151 @@ export interface Metrics {
   avg: number;
 }
 
-const eyebrow = (color: string) => ({
+const labelStyle = {
   fontFamily: MONO,
-  fontSize: 10.5,
-  letterSpacing: "0.13em",
+  fontSize: 10,
+  letterSpacing: "0.1em",
   textTransform: "uppercase" as const,
-  color,
-});
-
-const bigNum = {
-  fontFamily: MONO,
-  fontSize: 26,
-  fontWeight: 600,
-  lineHeight: 1,
+  color: C.soft,
 };
 
-/** A vivid stat tile (zamp.ai-style colour blocking). */
-function Tile({
-  bg,
-  fg,
-  sub,
+const num = { fontFamily: MONO, fontWeight: 600, lineHeight: 1, color: C.ink };
+
+function Cell({
   label,
-  icon,
   children,
-  flex = "1 1 168px",
-  border,
+  sub,
+  accent,
+  flex = "1 1 150px",
 }: {
-  bg: string;
-  fg: string;
-  sub: string;
   label: string;
-  icon?: ReactNode;
   children: ReactNode;
+  sub?: ReactNode;
+  accent?: string;
   flex?: string;
-  border?: string;
 }) {
   return (
     <div
-      className="rcv-card"
       style={{
         flex,
-        minWidth: 168,
-        background: bg,
-        border: border ?? "1px solid transparent",
-        borderRadius: 18,
-        padding: "15px 17px",
-        color: fg,
-        boxShadow: "0 1px 2px rgba(10,10,10,0.04)",
+        minWidth: 150,
+        background: C.surface,
+        border: `1px solid ${C.line}`,
+        borderLeft: accent ? `2px solid ${accent}` : `1px solid ${C.line}`,
+        borderRadius: R.lg,
+        padding: "13px 15px",
+        boxShadow: SHADOW,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6, ...eyebrow(sub) }}>
-        {icon}
-        {label}
-      </div>
-      <div style={{ marginTop: 9 }}>{children}</div>
+      <div style={labelStyle}>{label}</div>
+      <div style={{ marginTop: 8 }}>{children}</div>
+      {sub && <div style={{ fontSize: 11.5, color: C.soft, marginTop: 7, lineHeight: 1.4 }}>{sub}</div>}
     </div>
   );
 }
 
-export function Scorecard({ m, revDisplay }: { m: Metrics; revDisplay: number }) {
+export function Scorecard({
+  m,
+  revDisplay,
+  lift,
+}: {
+  m: Metrics;
+  revDisplay: number;
+  lift: Lift;
+}) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
-      {/* hero: the one number it owns */}
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 11, marginBottom: 14 }}>
+      {/* primary - the one number it owns. Solid dark card, no gradient/glow. */}
       <div
-        className="rcv-card"
         style={{
-          position: "relative",
-          overflow: "hidden",
-          flex: "2 1 300px",
-          minWidth: 270,
-          background: "linear-gradient(135deg, #161320 0%, #0A0A0A 60%)",
-          borderRadius: 20,
-          padding: "20px 22px",
+          flex: "2 1 280px",
+          minWidth: 250,
+          background: C.ink,
+          borderRadius: R.lg,
+          padding: "15px 18px",
           color: "#fff",
-          boxShadow: "0 24px 60px -28px rgba(91,51,224,0.7)",
+          boxShadow: SHADOW,
         }}
       >
-        {/* drifting glow */}
-        <div
-          style={{
-            position: "absolute",
-            width: 280,
-            height: 280,
-            right: -60,
-            top: -90,
-            background:
-              "radial-gradient(circle, rgba(91,51,224,0.55), rgba(47,107,255,0.25) 45%, transparent 70%)",
-            filter: "blur(18px)",
-            animation: "rcv-drift 7s ease-in-out infinite",
-            pointerEvents: "none",
-          }}
-        />
-        <div style={{ position: "relative" }}>
-          <div style={eyebrow("rgba(255,255,255,0.62)")}>Recovered this shift · revenue owned</div>
-          <div
-            style={{
-              fontFamily: MONO,
-              fontSize: 46,
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
-              marginTop: 10,
-              lineHeight: 1,
-            }}
-          >
-            {money(revDisplay)}
-          </div>
-          {/* animated underline */}
-          <div
-            style={{
-              height: 4,
-              borderRadius: 4,
-              marginTop: 14,
-              width: "100%",
-              backgroundImage:
-                "linear-gradient(90deg, #5B33E0, #2F6BFF, #5B33E0)",
-              backgroundSize: "200% 100%",
-              animation: "rcv-shimmer 3s linear infinite",
-            }}
-          />
-          <div
-            style={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.72)",
-              marginTop: 12,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <TrendingUp size={14} /> {m.recovered} user{m.recovered === 1 ? "" : "s"} re-engaged ·{" "}
-            <span style={{ color: "rgba(255,255,255,0.92)" }}>{money(m.atRisk)} still at risk</span>
-          </div>
+        <div style={{ ...labelStyle, color: "rgba(255,255,255,0.55)" }}>
+          Recovered this shift · revenue owned
+        </div>
+        <div style={{ ...num, fontSize: 40, color: "#fff", marginTop: 10 }}>{money(revDisplay)}</div>
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.62)", marginTop: 10 }}>
+          {m.recovered} recovered · <span style={{ color: "rgba(255,255,255,0.85)" }}>{money(m.atRisk)} still at risk</span>
         </div>
       </div>
 
-      {/* processed — cobalt */}
-      <Tile
-        bg={C.actioned}
-        fg="#fff"
-        sub="rgba(255,255,255,0.7)"
-        label="Processed"
-        icon={<Layers size={12} />}
+      {/* the differentiator: incremental lift vs an untouched control */}
+      <Cell
+        label="Incremental lift vs control"
+        accent={C.accent}
+        flex="1 1 210px"
+        sub={
+          lift.ready ? (
+            <>
+              contacted <b style={{ color: C.ink }}>{Math.round(lift.contactedRate * 100)}%</b> vs
+              control <b style={{ color: C.ink }}>{Math.round(lift.controlRate * 100)}%</b> ·{" "}
+              {money(lift.incrementalRevenue)} truly incremental
+            </>
+          ) : (
+            "Holds back a small untouched control to prove the touch caused the recovery. Record outcomes to populate."
+          )
+        }
       >
-        <div style={{ ...bigNum, fontSize: 30, color: "#fff" }}>
-          {m.decided}
-          <span style={{ fontSize: 15, color: "rgba(255,255,255,0.6)" }}> / {m.total}</span>
-        </div>
-      </Tile>
+        {lift.ready ? (
+          <div style={{ ...num, fontSize: 30, color: lift.liftPts >= 0 ? C.recovered : C.danger }}>
+            {lift.liftPts >= 0 ? "+" : ""}
+            {lift.liftPts}
+            <span style={{ fontSize: 15, color: C.soft }}> pts</span>
+          </div>
+        ) : (
+          <div style={{ ...num, fontSize: 22, color: C.faint }}>
+            -<span style={{ fontSize: 13, color: C.faint }}> gathering</span>
+          </div>
+        )}
+      </Cell>
 
-      {/* auto vs escalated — white, bold split bar */}
-      <Tile bg={C.surface} fg={C.ink} sub={C.soft} label="Auto-actioned vs escalated" border={`1px solid ${C.line}`}>
-        <div style={{ ...bigNum, fontSize: 24, color: C.actioned }}>
-          {m.autoPct}%<span style={{ color: C.faint, fontSize: 15 }}> · {m.escPct}%</span>
+      <Cell label="Processed">
+        <div style={{ ...num, fontSize: 28 }}>
+          {m.decided}
+          <span style={{ fontSize: 14, color: C.soft }}> / {m.total}</span>
+        </div>
+      </Cell>
+
+      <Cell label="Auto-actioned vs escalated">
+        <div style={{ ...num, fontSize: 22, color: C.accent }}>
+          {m.autoPct}%<span style={{ color: C.faint, fontSize: 14 }}> · {m.escPct}%</span>
         </div>
         <div
           style={{
             display: "flex",
-            height: 8,
-            borderRadius: 5,
+            height: 6,
+            borderRadius: 4,
             overflow: "hidden",
-            marginTop: 10,
-            background: C.line,
+            marginTop: 9,
+            background: C.lineSoft,
           }}
         >
-          <div style={{ width: `${m.autoPct}%`, background: C.actioned, transition: "width .5s ease" }} />
+          <div style={{ width: `${m.autoPct}%`, background: C.accent, transition: "width .5s ease" }} />
           <div style={{ width: `${m.escPct}%`, background: C.escalated, transition: "width .5s ease" }} />
         </div>
-      </Tile>
+      </Cell>
 
-      {/* avg decision time — sage */}
-      <Tile bg="#C7D49B" fg="#23310C" sub="#4D5E2A" label="Avg decision time" icon={<Clock size={12} />}>
-        <div style={{ ...bigNum, fontSize: 30, display: "flex", alignItems: "baseline", gap: 3, color: "#23310C" }}>
-          {m.avg ? m.avg.toFixed(1) : "—"}
-          <span style={{ fontSize: 15, color: "#4D5E2A" }}>s</span>
+      <Cell label="Avg decision time">
+        <div style={{ ...num, fontSize: 28, display: "flex", alignItems: "baseline", gap: 3 }}>
+          {m.avg ? m.avg.toFixed(1) : "-"}
+          <span style={{ fontSize: 14, color: C.soft }}>s</span>
         </div>
-      </Tile>
+      </Cell>
 
-      {/* skipped — purple gradient (the judgment number) */}
-      <Tile
-        bg="linear-gradient(135deg, #4A2FB8 0%, #221544 100%)"
-        fg="#fff"
-        sub="rgba(255,255,255,0.66)"
+      <Cell
         label="Skipped · already converting"
-        icon={<SkipForward size={12} />}
-        flex="1 1 200px"
+        accent={C.skipped}
+        sub="Declined to chase recoveries already in motion."
       >
-        <div style={{ ...bigNum, fontSize: 30, color: "#fff" }}>{m.skipped}</div>
-        <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.66)", marginTop: 7, lineHeight: 1.35 }}>
-          Declined to chase recoveries already in motion.
-        </div>
-      </Tile>
+        <div style={{ ...num, fontSize: 28, color: C.skipped }}>{m.skipped}</div>
+      </Cell>
     </div>
   );
 }

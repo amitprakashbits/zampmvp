@@ -19,9 +19,9 @@ export function EscalatedCard({
         <div style={{ fontSize: 12, color: C.soft, marginTop: 6 }}>
           {u.resolvedBy === "approved"
             ? u.dispatch?.mode === "shadow"
-              ? "Human approved — would send (shadow)."
-              : "Human approved — outreach dispatched."
-            : "Human overrode — closed without outreach."}
+              ? "Human approved - would send (shadow)."
+              : "Human approved - outreach dispatched."
+            : "Human overrode - closed without outreach."}
         </div>
       </CardShell>
     );
@@ -63,13 +63,13 @@ export function EscalatedCard({
         >
           <ShieldCheck size={13} style={{ flexShrink: 0, marginTop: 1 }} />
           <span>
-            <b style={{ fontWeight: 600 }}>Guardrail tripped — </b>
+            <b style={{ fontWeight: 600 }}>Guardrail tripped - </b>
             {u.result.guardrail}
           </span>
         </div>
       )}
       <div style={{ fontSize: 12.5, color: C.ink, marginTop: 7, lineHeight: 1.45 }}>
-        <span style={{ color: C.soft }}>Root cause — </span>
+        <span style={{ color: C.soft }}>Root cause - </span>
         {u.result?.root_cause}
       </div>
       <div style={{ fontSize: 12, color: C.soft, marginTop: 5, lineHeight: 1.45 }}>

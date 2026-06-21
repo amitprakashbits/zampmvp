@@ -1,5 +1,5 @@
 import { Brain } from "lucide-react";
-import { C, MONO } from "../theme";
+import { C, MONO, R, SHADOW } from "../theme";
 import type { LearningStats } from "../types";
 import { learningView } from "../lib/learning";
 import { CHANNEL_ICON, Eyebrow } from "./shared";
@@ -37,8 +37,9 @@ export function LearningPanel({ learning }: { learning: LearningStats }) {
       style={{
         background: C.surface,
         border: `1px solid ${C.line}`,
-        borderRadius: 18,
+        borderRadius: R.lg,
         padding: 18,
+        boxShadow: SHADOW,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 4 }}>

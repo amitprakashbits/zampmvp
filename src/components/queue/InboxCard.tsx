@@ -1,11 +1,33 @@
-import { C } from "../../theme";
+import { C, MONO } from "../../theme";
 import type { User } from "../../types";
 import { CardShell, Chip, Name } from "../shared";
 
-export function InboxCard({ u }: { u: User }) {
+export function InboxCard({ u, rank }: { u: User; rank?: number }) {
   return (
     <CardShell accent={C.inbox}>
-      <Name name={u.name} value={u.value} />
+      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+        {rank != null && (
+          <span
+            title="Triage rank by revenue-at-risk"
+            style={{
+              fontFamily: MONO,
+              fontSize: 10,
+              fontWeight: 600,
+              color: rank === 1 ? C.accent : C.soft,
+              background: rank === 1 ? C.accentSoft : C.surfaceAlt,
+              border: `1px solid ${rank === 1 ? "#D4E2FB" : C.line}`,
+              borderRadius: 5,
+              padding: "1px 5px",
+              flexShrink: 0,
+            }}
+          >
+            #{rank}
+          </span>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Name name={u.name} value={u.value} />
+        </div>
+      </div>
       <div style={{ fontSize: 12, color: C.soft, marginTop: 3 }}>
         {u.dropOff} · {u.idle}
       </div>

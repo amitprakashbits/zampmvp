@@ -82,7 +82,7 @@ export const SEED: Seed[] = [
   {
     id: "u-rohan",
     name: "Rohan Mehta",
-    dropOff: "KYC — manual review",
+    dropOff: "KYC - manual review",
     idle: "1d ago",
     pref: "Call",
     value: 180000,

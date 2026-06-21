@@ -3,7 +3,7 @@ import { money } from "./utils";
 
 /* ────────────────────────────────────────────────────────────────────────
    Operator guardrails. The agent is autonomous, but it runs inside limits the
-   operator sets — exactly the "delegate the work, keep the controls" posture.
+   operator sets - exactly the "delegate the work, keep the controls" posture.
    Guardrails run AFTER the agent's own decision (and the learning layer) and
    can only ever make a decision MORE conservative (ACT → ESCALATE), never less.
    ──────────────────────────────────────────────────────────────────────── */
@@ -12,6 +12,7 @@ export const DEFAULT_POLICY: Policy = {
   maxAutoValue: 100000,
   escalateNegativeSentiment: true,
   minConfidence: 0.55,
+  holdoutPct: 20,
 };
 
 const NEGATIVE_HINTS = [
