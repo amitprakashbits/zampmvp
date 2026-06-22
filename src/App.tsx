@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Inbox as InboxIcon,
   Zap,
   Beaker,
   Plus,
@@ -10,7 +9,7 @@ import {
   Eye,
   Compass,
 } from "lucide-react";
-import { C, LANES, MONO, R, SANS, SHADOW } from "./theme";
+import { C, MONO, R, SANS } from "./theme";
 import type {
   AgentDecision,
   AuditEntry,
@@ -36,7 +35,7 @@ import { money, sleep, stamp, useCountUp } from "./lib/utils";
 import { Hero } from "./components/Hero";
 import { TopBar } from "./components/TopBar";
 import { Scorecard, type Metrics } from "./components/Scorecard";
-import { Lane } from "./components/queue/Lane";
+import { QueueTable } from "./components/queue/QueueTable";
 import { AddPanel } from "./components/AddPanel";
 import { AuditTrail } from "./components/AuditTrail";
 import { LearningPanel } from "./components/LearningPanel";
@@ -430,16 +429,7 @@ export default function App() {
   const guardrailsFired = useMemo(() => users.filter((u) => u.result?.guardrail).length, [users]);
   const revDisplay = useCountUp(m.revenue);
 
-  const lanes = useMemo(() => {
-    const map: Record<string, User[]> = {};
-    LANES.forEach((l) => (map[l.key] = []));
-    users.forEach((u) => {
-      if (map[u.status]) map[u.status].push(u);
-    });
-    return map;
-  }, [users]);
-
-  const inboxCount = lanes.inbox.length;
+  const inboxCount = useMemo(() => users.filter((u) => u.status === "inbox").length, [users]);
   const canSimulate = users.some((u) => u.status === "actioned" && !u.outcome);
 
   /* ── chat / delegation surface ────────────────────────────────────── */
@@ -514,6 +504,8 @@ export default function App() {
         .rcv-card{ transition: transform .14s ease, box-shadow .18s ease, border-color .14s ease; }
         .rcv-card:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px -10px rgba(16,17,21,.28); border-color:#D8D8D2; }
         @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+        .rcv-queue-row:hover td { background: ${C.surfaceAlt} !important; }
+        .rcv-queue-row:hover { background: ${C.surfaceAlt}; }
         ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#DCDCD6;border-radius:8px} ::-webkit-scrollbar-thumb:hover{background:#C8C8C0}
         input::placeholder{color:${C.faint}}
       `}</style>
@@ -587,32 +579,15 @@ export default function App() {
 
           {showAdd && <AddPanel onAdd={addUser} onClose={() => setShowAdd(false)} />}
 
-          {/* queue board */}
-          <div style={{ background: C.surface, border: `1px solid ${C.line}`, borderRadius: R.lg, padding: 18, marginBottom: 14, boxShadow: SHADOW }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
-              <InboxIcon size={15} color={C.soft} />
-              <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.12em", textTransform: "uppercase", color: C.soft }}>
-                Queue · inbox → processing → outcome lanes
-              </span>
-              <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10.5, color: C.faint }}>
-                triaged by revenue-at-risk
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 4 }}>
-              {LANES.map((lane) => (
-                <Lane
-                  key={lane.key}
-                  lane={lane}
-                  items={lanes[lane.key]}
-                  phase={phase}
-                  ranks={ranks}
-                  onApprove={approve}
-                  onOverride={override}
-                  onOutcome={applyOutcome}
-                />
-              ))}
-            </div>
-          </div>
+          {/* queue table */}
+          <QueueTable
+            users={users}
+            phase={phase}
+            ranks={ranks}
+            onApprove={approve}
+            onOverride={override}
+            onOutcome={applyOutcome}
+          />
 
           {/* guardrails */}
           <div style={{ marginBottom: 14 }}>
