@@ -2,25 +2,41 @@ import { C, DISPLAY, MONO, R } from "../theme";
 import type { ApiMode } from "../types";
 import { Dot } from "./shared";
 
-function LogoMark({ size = 30 }: { size?: number }) {
+function LogoMark({ size = 36 }: { size?: number }) {
+  const sw = size * 0.095;
+  const r = sw / 2;
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 8,
-        background: C.ink,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 36 36"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ flexShrink: 0 }}
+      aria-hidden="true"
     >
-      <span style={{ display: "flex", flexDirection: "column", gap: size * 0.1 }}>
-        <span style={{ width: size * 0.42, height: size * 0.1, background: "#fff", borderRadius: 2, transform: "skewX(-18deg)" }} />
-        <span style={{ width: size * 0.42, height: size * 0.1, background: "#fff", borderRadius: 2, transform: "skewX(-18deg)" }} />
-      </span>
-    </div>
+      {/* vertical segment going down on the right */}
+      <line x1="26" y1="9" x2="26" y2="22" stroke={C.ink} strokeWidth={sw} strokeLinecap="round" />
+      {/* corner */}
+      <path
+        d={`M26,22 Q26,27 21,27`}
+        stroke={C.ink}
+        strokeWidth={sw}
+        fill="none"
+        strokeLinecap="round"
+      />
+      {/* horizontal segment going left */}
+      <line x1="21" y1="27" x2="11" y2="27" stroke={C.ink} strokeWidth={sw} strokeLinecap="round" />
+      {/* arrowhead */}
+      <polyline
+        points={`${11 + sw * 1.8},${27 - sw * 1.8} ${11},${27} ${11 + sw * 1.8},${27 + sw * 1.8}`}
+        stroke={C.ink}
+        strokeWidth={sw}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
