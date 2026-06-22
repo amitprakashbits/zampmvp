@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, Clock } from "lucide-react";
 import { C, MONO, R } from "../theme";
 import type { Policy } from "../types";
 import { money } from "../lib/utils";
 import { Eyebrow } from "./shared";
 import { Select } from "./Select";
+import type { CompliancePolicy } from "../lib/compliance";
+import { complianceWindowStatus } from "../lib/compliance";
 
 const VALUE_STEPS = [5000, 25000, 50000, 100000, 250000];
 
@@ -44,12 +46,17 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 export function GuardrailsPanel({
   policy,
   setPolicy,
+  compliance,
+  setCompliance,
   fired,
 }: {
   policy: Policy;
   setPolicy: (p: Policy) => void;
+  compliance: CompliancePolicy;
+  setCompliance: (p: CompliancePolicy) => void;
   fired: number;
 }) {
+  const win = complianceWindowStatus();
   const Row = ({ children }: { children: ReactNode }) => (
     <div
       style={{
@@ -152,6 +159,73 @@ export function GuardrailsPanel({
           </span>
         </div>
       </Row>
+
+      {/* TRAI / RBI compliance section */}
+      <div
+        style={{
+          marginTop: 14,
+          paddingTop: 14,
+          borderTop: `1px solid ${C.line}`,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <Clock size={13} color={win.open ? C.recovered : C.escalated} />
+          <span
+            style={{
+              fontFamily: MONO,
+              fontSize: 10,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: win.open ? C.recovered : C.escalated,
+            }}
+          >
+            TRAI / RBI compliance
+          </span>
+          <span
+            style={{
+              marginLeft: "auto",
+              fontFamily: MONO,
+              fontSize: 10,
+              color: win.open ? C.recovered : C.escalated,
+              background: win.open ? "#F0FDF4" : "#FEF2F2",
+              border: `1px solid ${win.open ? "#86EFAC" : "#FECACA"}`,
+              borderRadius: 99,
+              padding: "2px 8px",
+            }}
+          >
+            {win.open ? "Window open" : "Window closed"}
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 11.5,
+            color: C.soft,
+            marginBottom: 10,
+            lineHeight: 1.4,
+          }}
+        >
+          {win.label}
+          {!win.open && win.nextOpen && (
+            <span style={{ color: C.faint }}> · {win.nextOpen}</span>
+          )}
+        </div>
+
+        <Row>
+          {label("Respect TRAI quiet hours", "Block calls outside 9 AM - 9 PM IST, switch to WhatsApp")}
+          <Toggle
+            on={compliance.respectQuietHours}
+            onClick={() => setCompliance({ ...compliance, respectQuietHours: !compliance.respectQuietHours })}
+          />
+        </Row>
+
+        <Row>
+          {label("Require DPDP consent check", "Flag users where AI outreach consent is unverified")}
+          <Toggle
+            on={compliance.requireDpdpConsent}
+            onClick={() => setCompliance({ ...compliance, requireDpdpConsent: !compliance.requireDpdpConsent })}
+          />
+        </Row>
+      </div>
     </div>
   );
 }

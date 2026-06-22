@@ -4,7 +4,6 @@ import { Dot } from "./shared";
 
 function LogoMark({ size = 36 }: { size?: number }) {
   const sw = size * 0.095;
-  const r = sw / 2;
   return (
     <svg
       width={size}

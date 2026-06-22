@@ -64,10 +64,12 @@ export function Scorecard({
   m,
   revDisplay,
   lift,
+  atRiskPerHour,
 }: {
   m: Metrics;
   revDisplay: number;
   lift: Lift;
+  atRiskPerHour: number;
 }) {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 11, marginBottom: 14 }}>
@@ -162,6 +164,29 @@ export function Scorecard({
       >
         <div style={{ ...num, fontSize: 28, color: C.skipped }}>{m.skipped}</div>
       </Cell>
+
+      {atRiskPerHour > 0 && (
+        <Cell
+          label="Cost of delay · inbox"
+          accent="#DC2626"
+          flex="1 1 180px"
+          sub="Revenue degrading per hour while inbox users sit untouched."
+        >
+          <div
+            style={{
+              ...num,
+              fontSize: 26,
+              color: "#DC2626",
+              display: "flex",
+              alignItems: "baseline",
+              gap: 3,
+            }}
+          >
+            {money(atRiskPerHour)}
+            <span style={{ fontSize: 13, color: C.soft }}>/hr</span>
+          </div>
+        </Cell>
+      )}
     </div>
   );
 }

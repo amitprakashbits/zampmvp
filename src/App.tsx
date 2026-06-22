@@ -29,7 +29,8 @@ import { fresh, seedLearning } from "./lib/seed";
 import { API_MODE, getDecision } from "./lib/agent";
 import { applyLearning, recordOutcome as foldOutcome } from "./lib/learning";
 import { applyGuardrails, DEFAULT_POLICY } from "./lib/guardrails";
-import { computeLift, nextInQueue, triageRank } from "./lib/insights";
+import { computeLift, nextInQueue, triageRank, totalCostPerHour, computeDebrief } from "./lib/insights";
+import type { ShiftDebrief as ShiftDebriefData } from "./lib/insights";
 import { dispatchOutreach } from "./lib/dispatch";
 import { money, sleep, stamp, useCountUp } from "./lib/utils";
 import { Hero } from "./components/Hero";
@@ -45,6 +46,9 @@ import { CommandPalette, type Command } from "./components/CommandPalette";
 import { Onboarding, Checklist, type ChecklistState } from "./components/Onboarding";
 import { BootSkeleton } from "./components/Skeleton";
 import { respondToChat, type ChatContext } from "./lib/chat";
+import { ShiftDebrief } from "./components/ShiftDebrief";
+import { ChannelMatrix } from "./components/ChannelMatrix";
+import { DEFAULT_COMPLIANCE_POLICY, type CompliancePolicy } from "./lib/compliance";
 
 const PROC_STEPS = [
   "Reading signals",
@@ -68,6 +72,8 @@ export default function App() {
   const [mode, setModeState] = useState<RunMode>("shadow");
   const [learning, setLearning] = useState<LearningStats>(seedLearning);
   const [policy, setPolicyState] = useState<Policy>(DEFAULT_POLICY);
+  const [compliance, setCompliance] = useState<CompliancePolicy>(DEFAULT_COMPLIANCE_POLICY);
+  const [debrief, setDebrief] = useState<ShiftDebriefData | null>(null);
 
   // screen / surface state
   const [booting, setBooting] = useState(true);
@@ -266,6 +272,8 @@ export default function App() {
     }
     setRunning(false);
     setPhase("");
+    // compute and show the shift debrief
+    setDebrief(computeDebrief(usersRef.current, learningRef.current));
   }, [running, processOne, mark]);
 
   /* ── outcome feedback loop ────────────────────────────────────────── */
@@ -385,6 +393,7 @@ export default function App() {
     setRunning(false);
     setNote(null);
     setShowAdd(false);
+    setDebrief(null);
   }, [setU, setLearn]);
 
   /* ── metrics + insights ───────────────────────────────────────────── */
@@ -417,6 +426,7 @@ export default function App() {
 
   const lift = useMemo(() => computeLift(users), [users]);
   const ranks = useMemo(() => triageRank(users), [users]);
+  const atRiskPerHour = useMemo(() => totalCostPerHour(users), [users]);
   const guardrailsFired = useMemo(() => users.filter((u) => u.result?.guardrail).length, [users]);
   const revDisplay = useCountUp(m.revenue);
 
@@ -571,7 +581,9 @@ export default function App() {
             </div>
           )}
 
-          <Scorecard m={m} revDisplay={revDisplay} lift={lift} />
+          <Scorecard m={m} revDisplay={revDisplay} lift={lift} atRiskPerHour={atRiskPerHour} />
+
+          {debrief && <ShiftDebrief data={debrief} onDismiss={() => setDebrief(null)} />}
 
           {showAdd && <AddPanel onAdd={addUser} onClose={() => setShowAdd(false)} />}
 
@@ -604,17 +616,28 @@ export default function App() {
 
           {/* guardrails */}
           <div style={{ marginBottom: 14 }}>
-            <GuardrailsPanel policy={policy} setPolicy={tunePolicy} fired={guardrailsFired} />
+            <GuardrailsPanel
+              policy={policy}
+              setPolicy={tunePolicy}
+              compliance={compliance}
+              setCompliance={setCompliance}
+              fired={guardrailsFired}
+            />
           </div>
 
-          {/* learning + audit */}
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start" }}>
-            <div style={{ flex: "1 1 360px", minWidth: 320 }}>
+          {/* channel matrix + learning */}
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 14 }}>
+            <div style={{ flex: "2 1 420px", minWidth: 320 }}>
+              <ChannelMatrix learning={learning} />
+            </div>
+            <div style={{ flex: "1 1 280px", minWidth: 280 }}>
               <LearningPanel learning={learning} />
             </div>
-            <div style={{ flex: "1 1 360px", minWidth: 320 }}>
-              <AuditTrail log={log} onExport={() => { mark("exportedAudit"); }} registerExport={(fn) => (exportRef.current = fn)} />
-            </div>
+          </div>
+
+          {/* audit */}
+          <div style={{ marginBottom: 14 }}>
+            <AuditTrail log={log} onExport={() => { mark("exportedAudit"); }} registerExport={(fn) => (exportRef.current = fn)} />
           </div>
 
           <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: C.faint, fontFamily: MONO, letterSpacing: "0.04em" }}>
