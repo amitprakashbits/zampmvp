@@ -54,11 +54,11 @@ export function computeLift(users: User[]): Lift {
 }
 
 /* ── urgency scoring + cost of delay ──────────────────────────────────────
-   Fintech operators think in "cost of delay" — every hour a stalled user sits
+   Fintech operators think in "cost of delay" - every hour a stalled user sits
    untouched, recovery probability decays. We make that concrete on every card.
    ──────────────────────────────────────────────────────────────────────── */
 
-function parseIdleHours(idle: string): number {
+export function parseIdleHours(idle: string): number {
   const m = idle.match(/(\d+)m/);
   const h = idle.match(/(\d+)h/);
   const d = idle.match(/(\d+)d/);
@@ -227,6 +227,36 @@ export function nextInQueue(users: User[]): User | undefined {
   return users
     .filter((u) => u.status === "inbox")
     .sort((a, b) => b.value - a.value)[0];
+}
+
+/* ── SLA tracking ────────────────────────────────────────────────────────
+   Value tiers map to response SLAs: whale accounts need same-day human
+   attention, long-tail can wait. Showing breach status in the queue puts
+   urgency into operational language ops leaders actually use.
+   ──────────────────────────────────────────────────────────────────────── */
+
+export interface SlaStatus {
+  tier: "Whale" | "Mid" | "Long-tail";
+  slaHours: number;      // 2 / 6 / 24
+  idleHours: number;
+  remainingHours: number;
+  pctUsed: number;       // 0-1
+  breached: boolean;
+}
+
+export function computeSla(user: User): SlaStatus {
+  const idleHours = parseIdleHours(user.idle);
+  const tier = user.value >= 100_000 ? "Whale" : user.value >= 10_000 ? "Mid" : "Long-tail";
+  const slaHours = tier === "Whale" ? 2 : tier === "Mid" ? 6 : 24;
+  const remainingHours = slaHours - idleHours;
+  return {
+    tier,
+    slaHours,
+    idleHours,
+    remainingHours,
+    pctUsed: Math.min(1, idleHours / slaHours),
+    breached: remainingHours <= 0,
+  };
 }
 
 /** Rank (1-based) of a user within the current inbox by value-at-risk. */

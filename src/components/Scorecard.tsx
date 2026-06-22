@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { C, MONO, R, SHADOW } from "../theme";
-import { money } from "../lib/utils";
+import { money, useCountUp } from "../lib/utils";
 import type { Lift } from "../lib/insights";
 
 export interface Metrics {
@@ -71,10 +71,19 @@ export function Scorecard({
   lift: Lift;
   atRiskPerHour: number;
 }) {
+  const decidedAnim  = useCountUp(m.decided);
+  const autoPctAnim  = useCountUp(m.autoPct);
+  const escPctAnim   = useCountUp(m.escPct);
+  const skippedAnim  = useCountUp(m.skipped);
+  const cphAnim      = useCountUp(atRiskPerHour);
+  const recoveredAnim = useCountUp(m.recovered);
+  const liftPtsAnim  = useCountUp(lift.liftPts);
+
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 11, marginBottom: 14 }}>
-      {/* primary - the one number it owns. Solid dark card, no gradient/glow. */}
+      {/* primary - the one number it owns */}
       <div
+        className="rcv-card"
         style={{
           flex: "2 1 280px",
           minWidth: 250,
@@ -83,18 +92,20 @@ export function Scorecard({
           padding: "15px 18px",
           color: "#fff",
           boxShadow: SHADOW,
+          border: "1px solid transparent",
         }}
       >
         <div style={{ ...labelStyle, color: "rgba(255,255,255,0.55)" }}>
           Recovered this shift · revenue owned
         </div>
-        <div style={{ ...num, fontSize: 40, color: "#fff", marginTop: 10 }}>{money(revDisplay)}</div>
+        <div className="rcv-num" style={{ ...num, fontSize: 40, color: "#fff", marginTop: 10 }}>{money(revDisplay)}</div>
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.62)", marginTop: 10 }}>
-          {m.recovered} recovered · <span style={{ color: "rgba(255,255,255,0.85)" }}>{money(m.atRisk)} still at risk</span>
+          <span className="rcv-num">{Math.round(recoveredAnim)}</span> recovered ·{" "}
+          <span style={{ color: "rgba(255,255,255,0.85)" }}>{money(m.atRisk)} still at risk</span>
         </div>
       </div>
 
-      {/* the differentiator: incremental lift vs an untouched control */}
+      {/* incremental lift */}
       <Cell
         label="Incremental lift vs control"
         accent={C.accent}
@@ -113,8 +124,7 @@ export function Scorecard({
       >
         {lift.ready ? (
           <div style={{ ...num, fontSize: 30, color: lift.liftPts >= 0 ? C.recovered : C.danger }}>
-            {lift.liftPts >= 0 ? "+" : ""}
-            {lift.liftPts}
+            <span className="rcv-num">{liftPtsAnim >= 0 ? "+" : ""}{Math.round(liftPtsAnim)}</span>
             <span style={{ fontSize: 15, color: C.soft }}> pts</span>
           </div>
         ) : (
@@ -126,14 +136,15 @@ export function Scorecard({
 
       <Cell label="Processed">
         <div style={{ ...num, fontSize: 28 }}>
-          {m.decided}
+          <span className="rcv-num">{Math.round(decidedAnim)}</span>
           <span style={{ fontSize: 14, color: C.soft }}> / {m.total}</span>
         </div>
       </Cell>
 
       <Cell label="Auto-actioned vs escalated">
         <div style={{ ...num, fontSize: 22, color: C.accent }}>
-          {m.autoPct}%<span style={{ color: C.faint, fontSize: 14 }}> · {m.escPct}%</span>
+          <span className="rcv-num">{Math.round(autoPctAnim)}%</span>
+          <span style={{ color: C.faint, fontSize: 14 }}> · {Math.round(escPctAnim)}%</span>
         </div>
         <div
           style={{
@@ -145,14 +156,14 @@ export function Scorecard({
             background: C.lineSoft,
           }}
         >
-          <div style={{ width: `${m.autoPct}%`, background: C.accent, transition: "width .5s ease" }} />
-          <div style={{ width: `${m.escPct}%`, background: C.escalated, transition: "width .5s ease" }} />
+          <div style={{ width: `${autoPctAnim}%`, background: C.accent, transition: "width .6s cubic-bezier(.22,1,.36,1)" }} />
+          <div style={{ width: `${escPctAnim}%`, background: C.escalated, transition: "width .6s cubic-bezier(.22,1,.36,1)" }} />
         </div>
       </Cell>
 
       <Cell label="Avg decision time">
         <div style={{ ...num, fontSize: 28, display: "flex", alignItems: "baseline", gap: 3 }}>
-          {m.avg ? m.avg.toFixed(1) : "-"}
+          <span className="rcv-num">{m.avg ? m.avg.toFixed(1) : "-"}</span>
           <span style={{ fontSize: 14, color: C.soft }}>s</span>
         </div>
       </Cell>
@@ -162,31 +173,31 @@ export function Scorecard({
         accent={C.skipped}
         sub="Declined to chase recoveries already in motion."
       >
-        <div style={{ ...num, fontSize: 28, color: C.skipped }}>{m.skipped}</div>
+        <div style={{ ...num, fontSize: 28, color: C.skipped }}>
+          <span className="rcv-num">{Math.round(skippedAnim)}</span>
+        </div>
       </Cell>
 
-      {atRiskPerHour > 0 && (
-        <Cell
-          label="Cost of delay · inbox"
-          accent="#DC2626"
-          flex="1 1 180px"
-          sub="Revenue degrading per hour while inbox users sit untouched."
+      <Cell
+        label="Cost of delay · inbox"
+        accent={atRiskPerHour > 0 ? "#DC2626" : C.faint}
+        flex="1 1 180px"
+        sub={atRiskPerHour > 0 ? "Revenue degrading per hour while inbox users sit untouched." : "No inbox users - no active cost of delay."}
+      >
+        <div
+          style={{
+            ...num,
+            fontSize: 26,
+            color: atRiskPerHour > 0 ? "#DC2626" : C.faint,
+            display: "flex",
+            alignItems: "baseline",
+            gap: 3,
+          }}
         >
-          <div
-            style={{
-              ...num,
-              fontSize: 26,
-              color: "#DC2626",
-              display: "flex",
-              alignItems: "baseline",
-              gap: 3,
-            }}
-          >
-            {money(atRiskPerHour)}
-            <span style={{ fontSize: 13, color: C.soft }}>/hr</span>
-          </div>
-        </Cell>
-      )}
+          <span className="rcv-num">{atRiskPerHour > 0 ? money(Math.round(cphAnim)) : "-"}</span>
+          {atRiskPerHour > 0 && <span style={{ fontSize: 13, color: C.soft }}>/hr</span>}
+        </div>
+      </Cell>
     </div>
   );
 }

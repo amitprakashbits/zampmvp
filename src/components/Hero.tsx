@@ -3,7 +3,8 @@ import type { ApiMode } from "../types";
 import { Dot } from "./shared";
 
 function LogoMark({ size = 36 }: { size?: number }) {
-  const sw = size * 0.095;
+  const sw = Math.round(size * 0.092 * 10) / 10;
+  const tip = sw * 1.6;
   return (
     <svg
       width={size}
@@ -14,21 +15,15 @@ function LogoMark({ size = 36 }: { size?: number }) {
       style={{ flexShrink: 0 }}
       aria-hidden="true"
     >
-      {/* vertical segment going down on the right */}
-      <line x1="26" y1="9" x2="26" y2="22" stroke={C.ink} strokeWidth={sw} strokeLinecap="round" />
-      {/* corner */}
-      <path
-        d={`M26,22 Q26,27 21,27`}
-        stroke={C.ink}
-        strokeWidth={sw}
-        fill="none"
-        strokeLinecap="round"
-      />
-      {/* horizontal segment going left */}
-      <line x1="21" y1="27" x2="11" y2="27" stroke={C.ink} strokeWidth={sw} strokeLinecap="round" />
-      {/* arrowhead */}
+      {/* vertical segment down the right side */}
+      <line x1="25.5" y1="9" x2="25.5" y2="21.5" stroke={C.ink} strokeWidth={sw} strokeLinecap="round" />
+      {/* rounded corner */}
+      <path d="M25.5,21.5 Q25.5,27 20,27" stroke={C.ink} strokeWidth={sw} fill="none" strokeLinecap="round" />
+      {/* horizontal segment to the left */}
+      <line x1="20" y1="27" x2="11" y2="27" stroke={C.ink} strokeWidth={sw} strokeLinecap="round" />
+      {/* arrowhead pointing left */}
       <polyline
-        points={`${11 + sw * 1.8},${27 - sw * 1.8} ${11},${27} ${11 + sw * 1.8},${27 + sw * 1.8}`}
+        points={`${11 + tip},${27 - tip} ${11},${27} ${11 + tip},${27 + tip}`}
         stroke={C.ink}
         strokeWidth={sw}
         fill="none"
@@ -83,18 +78,18 @@ export function Hero({ apiMode }: { apiMode: ApiMode }) {
         </div>
       </div>
 
-      {/* right: first-person brief + reasoning-mode badge, on the same line */}
+      {/* right: first-person brief + reasoning-mode badge */}
       <div
         style={{
           flex: "1 1 420px",
           minWidth: 300,
           display: "flex",
           alignItems: "center",
-          gap: 12,
+          gap: 14,
           background: C.surface,
           border: `1px solid ${C.line}`,
           borderRadius: R.lg,
-          padding: "12px 15px",
+          padding: "13px 16px",
         }}
       >
         <p
@@ -102,12 +97,12 @@ export function Hero({ apiMode }: { apiMode: ApiMode }) {
             margin: 0,
             flex: 1,
             fontFamily: MONO,
-            fontSize: 12,
-            lineHeight: 1.55,
+            fontSize: 11.5,
+            lineHeight: 1.6,
             color: C.soft,
           }}
         >
-          <span style={{ color: C.ink }}>Hi, I'm Recover.</span> I work a queue of stalled users on
+          <span style={{ color: C.ink, fontWeight: 600 }}>Hi, I'm Recover.</span> I work a queue of stalled users on
           my own - diagnose, pick a channel, act or escalate, and learn from outcomes. I own one
           number: recovered revenue.
         </p>

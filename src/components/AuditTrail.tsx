@@ -29,10 +29,12 @@ export function AuditTrail({
   log,
   onExport,
   registerExport,
+  maxHeight = 320,
 }: {
   log: AuditEntry[];
   onExport?: () => void;
   registerExport?: (fn: () => void) => void;
+  maxHeight?: number;
 }) {
   const [filter, setFilter] = useState(0);
   const shown = log.filter((e) => FILTERS[filter].match(e.kind));
@@ -132,7 +134,7 @@ export function AuditTrail({
       <div
         style={{
           marginTop: 12,
-          maxHeight: 320,
+          maxHeight,
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",

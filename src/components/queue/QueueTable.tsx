@@ -10,11 +10,71 @@ import {
   SkipForward,
   ShieldCheck,
   Loader2,
+  Search,
+  ExternalLink,
+  Download,
 } from "lucide-react";
 import { C, MONO, R, SHADOW } from "../../theme";
 import type { OutcomeKind, User } from "../../types";
 import { money } from "../../lib/utils";
 import { DraftToggle, Eyebrow } from "../shared";
+import { computeSla, urgencyScore, recoveryProbability, type SlaStatus } from "../../lib/insights";
+
+function exportCsv(users: User[]) {
+  const headers = ["Name", "Value", "Status", "Drop-off reason", "Idle", "Preferred channel", "Recovery prob %", "Urgency score", "Agent action", "Confidence", "Outcome"];
+  const rows = users.map((u) => [
+    u.name,
+    u.value,
+    u.status,
+    `"${u.dropOff}"`,
+    u.idle,
+    u.pref,
+    recoveryProbability(u),
+    urgencyScore(u),
+    u.result?.action ?? "",
+    u.result?.confidence != null ? u.result.confidence.toFixed(2) : "",
+    u.outcome ?? "",
+  ]);
+  const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `recover-queue-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function SlaBadge({ sla }: { sla: SlaStatus }) {
+  const isBreached = sla.breached;
+  const isWarning = !isBreached && sla.pctUsed >= 0.70;
+  const color = isBreached ? "#B42318" : isWarning ? C.escalated : C.faint;
+  const bg    = isBreached ? "#FEF2F2" : isWarning ? "#FFFBEB" : C.surfaceAlt;
+  const bdr   = isBreached ? "#FECACA" : isWarning ? "#FDE68A" : C.line;
+  const label = isBreached
+    ? "SLA BREACH"
+    : sla.remainingHours < 1
+      ? `${sla.slaHours}h SLA · ${Math.round(sla.remainingHours * 60)}m left`
+      : `${sla.slaHours}h SLA · ${Math.round(sla.remainingHours)}h left`;
+  return (
+    <span
+      className={isBreached ? "rcv-sla-breach" : undefined}
+      style={{
+        fontFamily: MONO,
+        fontSize: 10,
+        letterSpacing: "0.03em",
+        color,
+        background: bg,
+        border: `1px solid ${bdr}`,
+        borderRadius: R.pill,
+        padding: "2px 6px",
+        whiteSpace: "nowrap",
+        lineHeight: 1.2,
+        display: "inline-block",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
 /* ── channel ── */
 const CH_ICON = { Call: Phone, WhatsApp: MessageCircle, Email: Mail };
@@ -391,6 +451,15 @@ const STATUS_ORDER: User["status"][] = [
   "processing", "inbox", "escalated", "actioned", "recovered", "skipped",
 ];
 
+type FilterKind = "all" | "inbox" | "escalated" | "needs-outcome";
+
+const FILTER_OPTS: { id: FilterKind; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "inbox", label: "Inbox" },
+  { id: "escalated", label: "Escalated" },
+  { id: "needs-outcome", label: "Needs outcome" },
+];
+
 export function QueueTable({
   users,
   phase,
@@ -398,6 +467,7 @@ export function QueueTable({
   onApprove,
   onOverride,
   onOutcome,
+  onViewUser,
 }: {
   users: User[];
   phase: string;
@@ -405,13 +475,24 @@ export function QueueTable({
   onApprove: (u: User) => void;
   onOverride: (u: User) => void;
   onOutcome: (u: User, o: OutcomeKind) => void;
+  onViewUser?: (u: User) => void;
 }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<FilterKind>("all");
 
   const sorted = [...users].sort((a, b) => {
     const oi = STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
     if (oi !== 0) return oi;
     return b.value - a.value;
+  });
+
+  const filtered = sorted.filter((u) => {
+    if (search && !u.name.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filter === "inbox") return u.status === "inbox";
+    if (filter === "escalated") return u.status === "escalated";
+    if (filter === "needs-outcome") return (u.status === "actioned" || u.status === "recovered") && !u.outcome;
+    return true;
   });
 
   const toggle = (id: string) => setExpanded((prev) => (prev === id ? null : id));
@@ -428,11 +509,121 @@ export function QueueTable({
       }}
     >
       {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         <Eyebrow>Queue · {users.length} users</Eyebrow>
         <span style={{ marginLeft: "auto", fontFamily: MONO, fontSize: 10.5, color: C.faint }}>
-          sorted by status then revenue-at-risk · click row to expand
+          click row to expand · ⬡ to open drawer
         </span>
+        <button
+          onClick={() => exportCsv(users)}
+          title="Export queue as CSV"
+          style={{
+            all: "unset",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            fontFamily: MONO,
+            fontSize: 10.5,
+            color: C.soft,
+            background: C.surfaceAlt,
+            border: `1px solid ${C.line}`,
+            borderRadius: R.md,
+            padding: "5px 10px",
+            transition: "background .12s, border-color .12s",
+          }}
+        >
+          <Download size={11} />
+          Export CSV
+        </button>
+      </div>
+
+      {/* search + filter row */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <div
+          style={{
+            position: "relative",
+            flex: "1 1 180px",
+            maxWidth: 280,
+          }}
+        >
+          <Search
+            size={13}
+            color={C.faint}
+            style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+          />
+          <input
+            type="text"
+            placeholder="Search by name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "6px 10px 6px 28px",
+              fontSize: 12,
+              fontFamily: MONO,
+              border: `1px solid ${C.line}`,
+              borderRadius: R.md,
+              background: C.surfaceAlt,
+              color: C.ink,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {FILTER_OPTS.map(({ id, label }) => {
+            const active = filter === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setFilter(id)}
+                style={{
+                  all: "unset",
+                  cursor: "pointer",
+                  fontFamily: MONO,
+                  fontSize: 10.5,
+                  letterSpacing: "0.02em",
+                  padding: "5px 10px",
+                  borderRadius: R.pill,
+                  border: `1px solid ${active ? C.accent : C.line}`,
+                  background: active ? C.accentSoft : C.surfaceAlt,
+                  color: active ? C.accent : C.soft,
+                  fontWeight: active ? 600 : 400,
+                  transition: "all .12s",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {label}
+                {id === "needs-outcome" && (() => {
+                  const n = users.filter((u) => (u.status === "actioned" || u.status === "recovered") && !u.outcome).length;
+                  return n > 0 ? (
+                    <span
+                      style={{
+                        marginLeft: 4,
+                        background: active ? C.accent : C.faint,
+                        color: "#fff",
+                        borderRadius: 99,
+                        fontSize: 9,
+                        fontWeight: 700,
+                        padding: "0 4px",
+                        lineHeight: "14px",
+                        display: "inline-block",
+                      }}
+                    >
+                      {n}
+                    </span>
+                  ) : null;
+                })()}
+              </button>
+            );
+          })}
+        </div>
+        {(search || filter !== "all") && (
+          <span style={{ fontFamily: MONO, fontSize: 10.5, color: C.faint }}>
+            {filtered.length} of {users.length}
+          </span>
+        )}
       </div>
 
       <LaneStrip users={users} />
@@ -463,12 +654,16 @@ export function QueueTable({
               <th style={{ width: 24 }} />
             </tr>
           </thead>
-          <tbody>
-            {sorted.map((u, i) => {
+          <tbody key={`${filter}-${search}`}>
+            {filtered.map((u, i) => {
               const isExpanded = expanded === u.id;
               const rank = ranks[u.id];
               const isProcessing = u.status === "processing";
               const accentColor = STATUS_META[u.status]?.color ?? C.soft;
+              const urgency = urgencyScore(u);
+              const recProb = recoveryProbability(u);
+              const urgencyColor = urgency >= 70 ? "#B42318" : urgency >= 40 ? C.escalated : "transparent";
+              const staggerDelay = `${Math.min(i * 0.04, 0.32)}s`;
 
               return (
                 <>
@@ -480,6 +675,8 @@ export function QueueTable({
                       borderBottom: isExpanded ? "none" : `1px solid ${C.lineSoft}`,
                       background: isExpanded ? C.surfaceAlt : "transparent",
                       transition: "background .12s",
+                      borderLeft: `3px solid ${urgencyColor}`,
+                      animation: `rcv-row-in .22s cubic-bezier(.22,1,.36,1) ${staggerDelay} both`,
                     }}
                     className="rcv-queue-row"
                   >
@@ -498,13 +695,54 @@ export function QueueTable({
                       {rank != null ? `#${rank}` : `${i + 1}`}
                     </td>
 
-                    {/* name + value */}
-                    <td style={{ padding: "11px 10px", minWidth: 140 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: C.ink }}>{u.name}</div>
-                      <div style={{ fontFamily: MONO, fontSize: 11, color: C.soft, marginTop: 1 }}>
-                        {money(u.value)}
-                        {u.heldOut && (
-                          <span style={{ color: C.faint, marginLeft: 5 }}>· control</span>
+                    {/* name + value + recovery prob */}
+                    <td style={{ padding: "11px 10px", minWidth: 150 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: C.ink }}>{u.name}</span>
+                        {onViewUser && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onViewUser(u); }}
+                            title="View full profile"
+                            style={{
+                              all: "unset",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 18,
+                              height: 18,
+                              borderRadius: 5,
+                              border: `1px solid ${C.line}`,
+                              background: C.surfaceAlt,
+                              color: C.faint,
+                              flexShrink: 0,
+                              transition: "background .12s, border-color .12s",
+                            }}
+                          >
+                            <ExternalLink size={10} />
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ fontFamily: MONO, fontSize: 11, color: C.soft, marginTop: 1, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span>{money(u.value)}</span>
+                        {u.heldOut && <span style={{ color: C.faint }}>· control</span>}
+                        {u.status === "inbox" && recProb > 0 && (
+                          <span
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 3,
+                              fontSize: 9.5,
+                              fontFamily: MONO,
+                              color: recProb >= 60 ? C.recovered : recProb >= 40 ? C.escalated : C.faint,
+                              background: recProb >= 60 ? "#F0FDF4" : recProb >= 40 ? "#FFFBEB" : C.surfaceAlt,
+                              border: `1px solid ${recProb >= 60 ? "#86EFAC" : recProb >= 40 ? "#FDE68A" : C.line}`,
+                              borderRadius: 999,
+                              padding: "1px 5px",
+                            }}
+                          >
+                            {recProb}% recov.
+                          </span>
                         )}
                       </div>
                     </td>
@@ -512,7 +750,10 @@ export function QueueTable({
                     {/* drop-off */}
                     <td style={{ padding: "11px 10px", minWidth: 160 }}>
                       <div style={{ fontSize: 12, color: C.soft }}>{u.dropOff}</div>
-                      <div style={{ fontSize: 11, color: C.faint, marginTop: 1 }}>{u.idle}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 3, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 11, color: C.faint }}>{u.idle}</span>
+                        {u.status === "inbox" && <SlaBadge sla={computeSla(u)} />}
+                      </div>
                     </td>
 
                     {/* channel */}
@@ -633,6 +874,17 @@ export function QueueTable({
       {users.length === 0 && (
         <div style={{ textAlign: "center", padding: "32px 0", fontSize: 13, color: C.faint }}>
           Queue is empty. Add users or reset to reload the seed data.
+        </div>
+      )}
+      {users.length > 0 && filtered.length === 0 && (
+        <div style={{ textAlign: "center", padding: "32px 0", fontSize: 13, color: C.faint }}>
+          No users match the current filter.{" "}
+          <button
+            onClick={() => { setSearch(""); setFilter("all"); }}
+            style={{ all: "unset", cursor: "pointer", color: C.accent, textDecoration: "underline", fontSize: 13 }}
+          >
+            Clear filters
+          </button>
         </div>
       )}
     </div>

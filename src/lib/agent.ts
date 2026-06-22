@@ -6,15 +6,16 @@ import { sleep } from "./utils";
 
 /* ────────────────────────────────────────────────────────────────────────
    The agent's reasoning. Two interchangeable backends behind one call:
-     • LIVE  - claude-sonnet-4-6 via the Anthropic API (needs a key).
+     • LIVE  - deepseek-chat via the DeepSeek API (needs a key).
      • MOCK  - deterministic local rules (zero setup; default).
    Both return the SAME shape; the learning layer is applied on top in App.
    ──────────────────────────────────────────────────────────────────────── */
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "deepseek-chat";
 const MAX_TOKENS = 1000;
+const DEEPSEEK_BASE = "https://api.deepseek.com/v1";
 
-const apiKey = (import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined)?.trim();
+const apiKey = (import.meta.env.VITE_DEEPSEEK_API_KEY as string | undefined)?.trim();
 
 /** Live when a key is present, otherwise mock. Decided once at load. */
 export const API_MODE: ApiMode = apiKey ? "live" : "mock";
@@ -84,14 +85,11 @@ Return ONLY strict minified JSON with exactly these keys: root_cause, channel, a
 }
 
 async function callLiveAgent(user: User, learning: LearningStats): Promise<AgentDecision> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey as string,
-      "anthropic-version": "2023-06-01",
-      // Required to call the Anthropic API directly from a browser.
-      "anthropic-dangerous-direct-browser-access": "true",
+      "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: MODEL,
@@ -102,10 +100,7 @@ async function callLiveAgent(user: User, learning: LearningStats): Promise<Agent
   if (!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || "api error");
-  const text = (data.content || [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("\n");
+  const text = data.choices?.[0]?.message?.content ?? "";
   return parseAgentJSON(text);
 }
 
@@ -114,29 +109,22 @@ export async function liveChatComplete(
   system: string,
   turns: { role: "user" | "assistant"; content: string }[],
 ): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey as string,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
+      "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system,
-      messages: turns,
+      messages: [{ role: "system", content: system }, ...turns],
     }),
   });
   if (!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
   if (data.error) throw new Error(data.error.message || "api error");
-  return (data.content || [])
-    .filter((b: { type: string }) => b.type === "text")
-    .map((b: { text: string }) => b.text)
-    .join("\n")
-    .trim();
+  return (data.choices?.[0]?.message?.content ?? "").trim();
 }
 
 /** Single entry point used by the queue worker. Picks backend by API_MODE. */
@@ -147,7 +135,7 @@ export async function getDecision(
   if (API_MODE === "live") {
     return callLiveAgent(user, learning);
   }
-  // Mock: a touch of latency so the "working…" state reads like real work,
+  // Mock: a touch of latency so the "working..." state reads like real work,
   // and the avg-decision-time metric is meaningful.
   await sleep(700 + Math.floor(Math.random() * 700));
   return mockDecision(user);

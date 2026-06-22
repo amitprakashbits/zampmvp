@@ -9,7 +9,7 @@ import {
   Eye,
   Compass,
 } from "lucide-react";
-import { C, MONO, R, SANS } from "./theme";
+import { C, MONO, SANS } from "./theme";
 import type {
   AgentDecision,
   AuditEntry,
@@ -33,21 +33,20 @@ import type { ShiftDebrief as ShiftDebriefData } from "./lib/insights";
 import { dispatchOutreach } from "./lib/dispatch";
 import { money, sleep, stamp, useCountUp } from "./lib/utils";
 import { Hero } from "./components/Hero";
-import { TopBar } from "./components/TopBar";
-import { Scorecard, type Metrics } from "./components/Scorecard";
-import { QueueTable } from "./components/queue/QueueTable";
-import { AddPanel } from "./components/AddPanel";
-import { AuditTrail } from "./components/AuditTrail";
-import { LearningPanel } from "./components/LearningPanel";
-import { GuardrailsPanel } from "./components/GuardrailsPanel";
+import { Nav, type Page } from "./components/Nav";
+import type { Metrics } from "./components/Scorecard";
 import { ChatPanel } from "./components/ChatPanel";
 import { CommandPalette, type Command } from "./components/CommandPalette";
 import { Onboarding, Checklist, type ChecklistState } from "./components/Onboarding";
 import { BootSkeleton } from "./components/Skeleton";
 import { respondToChat, type ChatContext } from "./lib/chat";
-import { ShiftDebrief } from "./components/ShiftDebrief";
-import { ChannelMatrix } from "./components/ChannelMatrix";
 import { DEFAULT_COMPLIANCE_POLICY, type CompliancePolicy } from "./lib/compliance";
+import { DashboardPage } from "./pages/DashboardPage";
+import { QueuePage } from "./pages/QueuePage";
+import { IntelligencePage } from "./pages/IntelligencePage";
+import { LearningPage } from "./pages/LearningPage";
+import { GuardrailsPage } from "./pages/GuardrailsPage";
+import { AuditPage } from "./pages/AuditPage";
 
 const PROC_STEPS = [
   "Reading signals",
@@ -57,7 +56,6 @@ const PROC_STEPS = [
   "Logging decision",
 ];
 
-/** How much an outreach lifts comeback odds for a contacted user (vs control). */
 const TOUCH_UPLIFT = 0.2;
 
 export default function App() {
@@ -73,8 +71,8 @@ export default function App() {
   const [policy, setPolicyState] = useState<Policy>(DEFAULT_POLICY);
   const [compliance, setCompliance] = useState<CompliancePolicy>(DEFAULT_COMPLIANCE_POLICY);
   const [debrief, setDebrief] = useState<ShiftDebriefData | null>(null);
+  const [page, setPage] = useState<Page>("dashboard");
 
-  // screen / surface state
   const [booting, setBooting] = useState(true);
   const [onboarding, setOnboarding] = useState(true);
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -91,7 +89,6 @@ export default function App() {
     setChecklist((c) => (c[k] ? c : { ...c, [k]: true }));
   }, []);
 
-  // Refs mirror state so the async queue worker reads current values mid-shift.
   const usersRef = useRef(users);
   const setU = useCallback((updater: User[] | ((prev: User[]) => User[])) => {
     usersRef.current = typeof updater === "function" ? updater(usersRef.current) : updater;
@@ -115,7 +112,6 @@ export default function App() {
     policyRef.current = next;
     setPolicyState(next);
   }, []);
-  // operator-initiated policy change (also advances the activation checklist)
   const tunePolicy = useCallback(
     (next: Policy) => {
       setPolicy(next);
@@ -124,7 +120,6 @@ export default function App() {
     [setPolicy, mark],
   );
 
-  // holdout accounting per shift (largest-remainder so small queues still hold ~holdoutPct)
   const actSeqRef = useRef(0);
   const heldSeqRef = useRef(0);
 
@@ -139,13 +134,11 @@ export default function App() {
     setLog((l) => [{ time: stamp(), who, text, kind }, ...l]);
   }, []);
 
-  /* boot: brief skeleton so the first paint feels like a real dashboard load */
   useEffect(() => {
     const t = setTimeout(() => setBooting(false), 780);
     return () => clearTimeout(t);
   }, []);
 
-  /* global Cmd/Ctrl-K command palette */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
@@ -158,7 +151,6 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [mark]);
 
-  /* ── process one user end-to-end ──────────────────────────────────── */
   const processOne = useCallback(
     async (user: User) => {
       patch(user.id, { status: "processing" });
@@ -196,7 +188,6 @@ export default function App() {
         return;
       }
 
-      // learning may shift the channel; guardrails may force an escalation.
       const learned = applyLearning(base, user, learningRef.current);
       const result = applyGuardrails(learned, user, policyRef.current);
       audit(user.name, `diagnosed - ${result.root_cause} (confidence ${result.confidence.toFixed(2)})`, "diagnosed");
@@ -216,7 +207,6 @@ export default function App() {
         return;
       }
 
-      // ACT - but first decide if this one is held back as an untouched control.
       actSeqRef.current += 1;
       const target = Math.round((actSeqRef.current * policyRef.current.holdoutPct) / 100);
       const heldOut = target > heldSeqRef.current;
@@ -265,17 +255,15 @@ export default function App() {
     actSeqRef.current = 0;
     heldSeqRef.current = 0;
     for (;;) {
-      const next = nextInQueue(usersRef.current); // triage: highest value-at-risk first
+      const next = nextInQueue(usersRef.current);
       if (!next) break;
       await processOne(next);
     }
     setRunning(false);
     setPhase("");
-    // compute and show the shift debrief
     setDebrief(computeDebrief(usersRef.current, learningRef.current));
   }, [running, processOne, mark]);
 
-  /* ── outcome feedback loop ────────────────────────────────────────── */
   const applyOutcome = useCallback(
     (user: User, outcome: OutcomeKind) => {
       const result = user.result;
@@ -284,7 +272,6 @@ export default function App() {
       const reason = user.dropOff;
       mark("recordedOutcome");
 
-      // control users: never contacted - record for the lift calc only.
       if (user.heldOut) {
         patch(user.id, { outcome });
         audit(
@@ -297,7 +284,6 @@ export default function App() {
         return;
       }
 
-      // contacted users: fold into learning, move lane, count revenue.
       setLearn(foldOutcome(learningRef.current, reason, channel, outcome));
       if (outcome === "recovered") {
         patch(user.id, { status: "recovered", outcome });
@@ -324,7 +310,6 @@ export default function App() {
       const p = u.propensity ?? 0.5;
       let outcome: OutcomeKind;
       if (u.heldOut) {
-        // control gets no uplift - this is the baseline
         outcome = r < p ? "recovered" : "ignored";
       } else {
         const eff = Math.min(0.97, p + TOUCH_UPLIFT);
@@ -337,7 +322,6 @@ export default function App() {
     );
   }, [applyOutcome]);
 
-  /* ── human review ─────────────────────────────────────────────────── */
   const approve = useCallback(
     async (u: User) => {
       const dispatch = await dispatchOutreach(
@@ -395,7 +379,6 @@ export default function App() {
     setDebrief(null);
   }, [setU, setLearn]);
 
-  /* ── metrics + insights ───────────────────────────────────────────── */
   const m: Metrics = useMemo(() => {
     const by = (s: User["status"]) => users.filter((u) => u.status === s).length;
     const actioned = by("actioned");
@@ -432,7 +415,6 @@ export default function App() {
   const inboxCount = useMemo(() => users.filter((u) => u.status === "inbox").length, [users]);
   const canSimulate = users.some((u) => u.status === "actioned" && !u.outcome);
 
-  /* ── chat / delegation surface ────────────────────────────────────── */
   const chatRespond = (message: string, history: ChatMessage[]) => {
     const ctx: ChatContext = { mode, apiMode: API_MODE, metrics: m, inbox: inboxCount, users, learning, policy };
     return respondToChat(message, ctx, history);
@@ -454,6 +436,7 @@ export default function App() {
         break;
       case "add_user":
         setShowAdd(true);
+        setPage("queue");
         break;
       case "open_command":
         setCmdOpen(true);
@@ -464,20 +447,26 @@ export default function App() {
     }
   };
 
-  /* ── command palette ──────────────────────────────────────────────── */
+  const exportRef = useRef<(() => void) | null>(null);
+
   const commands: Command[] = [
-    { id: "run", label: "Run shift", group: "Agent", icon: Zap, hint: inboxCount ? `${inboxCount}` : undefined, keywords: "work queue start", disabled: running || inboxCount === 0, run: () => void runShift() },
+    { id: "run", label: "Run shift", group: "Agent", icon: Zap, hint: inboxCount ? `${inboxCount}` : undefined, keywords: "work queue start", disabled: running || inboxCount === 0, run: () => { setPage("queue"); void runShift(); } },
     { id: "sim", label: "Simulate outcomes", group: "Agent", icon: Beaker, keywords: "record results lift", disabled: running || !canSimulate, run: simulateOutcomes },
     { id: "mode", label: mode === "shadow" ? "Switch to Live mode" : "Switch to Shadow mode", group: "Agent", icon: Eye, keywords: "dry run send dispatch", disabled: running, run: () => setMode(mode === "shadow" ? "live" : "shadow") },
-    { id: "add", label: "Add a stalled user", group: "Queue", icon: Plus, keywords: "new user", disabled: running, run: () => setShowAdd(true) },
+    { id: "add", label: "Add a stalled user", group: "Queue", icon: Plus, keywords: "new user", disabled: running, run: () => { setShowAdd(true); setPage("queue"); } },
     { id: "assistant", label: "Open the assistant", group: "Help", icon: MessageSquare, keywords: "chat ask delegate", run: () => { setChatOpen(true); mark("usedAssistant"); } },
     { id: "export", label: "Export audit log", group: "Audit", icon: Download, keywords: "download json compliance", disabled: log.length === 0, run: () => { exportRef.current?.(); } },
     { id: "tour", label: "Restart the tour", group: "Help", icon: Compass, keywords: "onboarding guide help", run: () => setOnboarding(true) },
     { id: "reset", label: "Reset the shift", group: "Agent", icon: RotateCcw, keywords: "clear start over", disabled: running, run: reset },
   ];
-  const exportRef = useRef<(() => void) | null>(null);
 
   const showChecklist = !checklistDismissed && !booting && !onboarding;
+
+  const navBadges = {
+    queue: inboxCount || undefined,
+    audit: log.length > 0 ? log.length : undefined,
+    guardrails: guardrailsFired > 0 ? guardrailsFired : undefined,
+  };
 
   return (
     <div
@@ -493,129 +482,135 @@ export default function App() {
       }}
     >
       <style>{`
-        @keyframes rcv-ping { 0%{transform:scale(1);opacity:.5} 70%,100%{transform:scale(2.4);opacity:0} }
-        @keyframes rcv-in { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
-        @keyframes rcv-rise { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
-        @keyframes rcv-fade { from{opacity:0} to{opacity:1} }
-        @keyframes rcv-pop { from{opacity:0;transform:translateY(-4px) scale(.99)} to{opacity:1;transform:none} }
-        @keyframes rcv-blink { 0%,50%{opacity:1} 50.01%,100%{opacity:0} }
-        @keyframes rcv-skel { 0%{opacity:1} 50%{opacity:.55} 100%{opacity:1} }
-        .rcv-skel{ animation: rcv-skel 1.3s ease-in-out infinite; }
-        .rcv-card{ transition: transform .14s ease, box-shadow .18s ease, border-color .14s ease; }
-        .rcv-card:hover{ transform: translateY(-1px); box-shadow: 0 6px 18px -10px rgba(16,17,21,.28); border-color:#D8D8D2; }
-        @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+        @keyframes rcv-ping   { 0%{transform:scale(1);opacity:.5} 70%,100%{transform:scale(2.4);opacity:0} }
+        @keyframes rcv-in     { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+        @keyframes rcv-rise   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+        @keyframes rcv-fade   { from{opacity:0} to{opacity:1} }
+        @keyframes rcv-pop    { from{opacity:0;transform:translateY(-4px) scale(.99)} to{opacity:1;transform:none} }
+        @keyframes rcv-blink  { 0%,50%{opacity:1} 50.01%,100%{opacity:0} }
+        @keyframes rcv-skel   { 0%{opacity:1} 50%{opacity:.55} 100%{opacity:1} }
+        @keyframes rcv-page   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+        @keyframes rcv-row-in { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:none} }
+        @keyframes rcv-sla-pulse {
+          0%,100%{ box-shadow:0 0 0 0 rgba(180,35,24,0.35) }
+          60%    { box-shadow:0 0 0 5px rgba(180,35,24,0) }
+        }
+        @keyframes rcv-num-up { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
+        @keyframes rcv-shimmer {
+          0%   { background-position:-200% 0 }
+          100% { background-position: 200% 0 }
+        }
+        .rcv-skel   { animation: rcv-skel 1.3s ease-in-out infinite; }
+        .rcv-card   { transition: transform .16s cubic-bezier(.22,1,.36,1), box-shadow .18s ease, border-color .14s ease; }
+        .rcv-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px -12px rgba(16,17,21,.22); border-color:#D2D2CA; }
+        .rcv-card:active { transform:translateY(0); }
+        .rcv-num    { display:inline-block; animation: rcv-num-up .35s cubic-bezier(.22,1,.36,1) both; }
+        .rcv-queue-row { transition: background .1s ease; }
         .rcv-queue-row:hover td { background: ${C.surfaceAlt} !important; }
         .rcv-queue-row:hover { background: ${C.surfaceAlt}; }
+        .rcv-sla-breach { animation: rcv-sla-pulse 1.8s ease infinite; border-radius: 999px; }
+        @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
         ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#DCDCD6;border-radius:8px} ::-webkit-scrollbar-thumb:hover{background:#C8C8C0}
         input::placeholder{color:${C.faint}}
+        input:focus{outline:none;border-color:${C.accent}!important;box-shadow:0 0 0 2px rgba(37,99,235,.15)!important}
       `}</style>
 
       {booting ? (
         <BootSkeleton />
       ) : (
-        <div style={{ maxWidth: 1320, margin: "0 auto", padding: "22px 22px 64px", animation: "rcv-fade .25s ease" }}>
+        <div
+          style={{
+            maxWidth: 1320,
+            margin: "0 auto",
+            padding: "22px 22px 64px",
+            animation: "rcv-fade .25s ease",
+          }}
+        >
           <Hero apiMode={API_MODE} />
 
-          <TopBar
-            running={running}
-            phase={phase}
-            inboxCount={inboxCount}
-            mode={mode}
-            onToggleMode={setMode}
-            onToggleAdd={() => setShowAdd((s) => !s)}
-            onReset={reset}
-            onRunShift={runShift}
-            onSimulate={simulateOutcomes}
-            canSimulate={canSimulate}
-            onOpenCommand={() => setCmdOpen(true)}
-          />
+          <Nav page={page} setPage={setPage} badges={navBadges} />
 
-          {/* mode banner */}
-          <div
-            style={{
-              background: mode === "shadow" ? C.surfaceAlt : C.accentSoft,
-              border: `1px solid ${mode === "shadow" ? C.line : "#D4E2FB"}`,
-              color: mode === "shadow" ? C.soft : C.accent,
-              borderRadius: R.md,
-              padding: "9px 13px",
-              fontSize: 12.5,
-              marginBottom: 12,
-              lineHeight: 1.45,
-            }}
-          >
-            {mode === "shadow" ? (
-              <>
-                <b style={{ color: C.ink }}>Shadow mode (dry-run).</b> Every real decision is made and the
-                exact payload it <i>would</i> dispatch is shown - nothing is sent. The safe rollout posture.
-              </>
-            ) : (
-              <>
-                <b>Live mode.</b> Actions route through the single dispatch seam in{" "}
-                <code style={{ fontFamily: MONO }}>lib/dispatch.ts</code> - a clearly marked stub (TODO:
-                Twilio / WhatsApp / email). It still does <b>not</b> send anything.
-              </>
-            )}
-          </div>
+          <div key={page} style={{ animation: "rcv-page .22s cubic-bezier(.22,1,.36,1) both" }}>
 
-          {note && (
-            <div
-              style={{
-                background: C.accentSoft,
-                border: `1px solid #D4E2FB`,
-                color: C.accent,
-                borderRadius: R.md,
-                padding: "9px 13px",
-                fontSize: 12.5,
-                marginBottom: 12,
-              }}
-            >
-              {note}
-            </div>
+          {page === "dashboard" && (
+            <DashboardPage
+              m={m}
+              revDisplay={revDisplay}
+              lift={lift}
+              atRiskPerHour={atRiskPerHour}
+              users={users}
+              mode={mode}
+              note={note}
+              debrief={debrief}
+              onDismissDebrief={() => setDebrief(null)}
+              onNavigate={setPage}
+              running={running}
+            />
           )}
 
-          <Scorecard m={m} revDisplay={revDisplay} lift={lift} atRiskPerHour={atRiskPerHour} />
+          {page === "queue" && (
+            <QueuePage
+              users={users}
+              phase={phase}
+              ranks={ranks}
+              running={running}
+              mode={mode}
+              note={note}
+              showAdd={showAdd}
+              canSimulate={canSimulate}
+              inboxCount={inboxCount}
+              onToggleMode={setMode}
+              onToggleAdd={() => setShowAdd((s) => !s)}
+              onReset={reset}
+              onRunShift={runShift}
+              onSimulate={simulateOutcomes}
+              onOpenCommand={() => setCmdOpen(true)}
+              onAdd={addUser}
+              onApprove={approve}
+              onOverride={override}
+              onOutcome={applyOutcome}
+            />
+          )}
 
-          {debrief && <ShiftDebrief data={debrief} onDismiss={() => setDebrief(null)} />}
+          {page === "intelligence" && (
+            <IntelligencePage users={users} learning={learning} />
+          )}
 
-          {showAdd && <AddPanel onAdd={addUser} onClose={() => setShowAdd(false)} />}
+          {page === "learning" && (
+            <LearningPage learning={learning} users={users} />
+          )}
 
-          {/* queue table */}
-          <QueueTable
-            users={users}
-            phase={phase}
-            ranks={ranks}
-            onApprove={approve}
-            onOverride={override}
-            onOutcome={applyOutcome}
-          />
-
-          {/* guardrails */}
-          <div style={{ marginBottom: 14 }}>
-            <GuardrailsPanel
+          {page === "guardrails" && (
+            <GuardrailsPage
               policy={policy}
               setPolicy={tunePolicy}
               compliance={compliance}
               setCompliance={setCompliance}
               fired={guardrailsFired}
+              log={log}
             />
-          </div>
+          )}
 
-          {/* channel matrix + learning */}
-          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 14 }}>
-            <div style={{ flex: "2 1 420px", minWidth: 320 }}>
-              <ChannelMatrix learning={learning} />
-            </div>
-            <div style={{ flex: "1 1 280px", minWidth: 280 }}>
-              <LearningPanel learning={learning} />
-            </div>
-          </div>
+          {page === "audit" && (
+            <AuditPage
+              log={log}
+              onExport={() => { mark("exportedAudit"); }}
+              registerExport={(fn) => (exportRef.current = fn)}
+            />
+          )}
 
-          {/* audit */}
-          <div style={{ marginBottom: 14 }}>
-            <AuditTrail log={log} onExport={() => { mark("exportedAudit"); }} registerExport={(fn) => (exportRef.current = fn)} />
-          </div>
+          </div>{/* end page transition wrapper */}
 
-          <div style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: C.faint, fontFamily: MONO, letterSpacing: "0.04em" }}>
+          <div
+            style={{
+              textAlign: "center",
+              marginTop: 20,
+              fontSize: 11,
+              color: C.faint,
+              fontFamily: MONO,
+              letterSpacing: "0.04em",
+            }}
+          >
             {API_MODE === "live" ? "Reasoning runs on claude-sonnet-4-6" : "Reasoning runs on built-in deterministic logic"} · decides
             ACT / ESCALATE / SKIP per user, learns from outcomes, proves its own lift
           </div>
@@ -626,7 +621,10 @@ export default function App() {
         <Onboarding
           onFinish={(runNow) => {
             setOnboarding(false);
-            if (runNow) void runShift();
+            if (runNow) {
+              setPage("queue");
+              void runShift();
+            }
           }}
         />
       )}
